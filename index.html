@@ -155,7 +155,7 @@
         Conectando ao Firebase...
       </h2>
       <p class="text-sm text-slate-500 mt-2" id="loading-text">
-        Sincronizando dados
+        Sincronizando dados em tempo real
       </p>
     </div>
 
@@ -243,7 +243,7 @@
         </form>
 
         <p class="text-center text-xs text-slate-400 mt-8 font-medium">
-          Versão 4.0 Cloud (Firebase)
+          Versão 4.1.1 Real-Time (Firebase)
         </p>
       </div>
     </div>
@@ -364,7 +364,7 @@
               <div
                 class="w-2 h-2 rounded-full bg-green-500 animate-pulse"
               ></div>
-              Online - Firebase
+              Online - Firebase (Real-time)
             </div>
           </div>
 
@@ -650,6 +650,7 @@
         doc,
         updateDoc,
         writeBatch,
+        onSnapshot,
       } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       import {
         getAuth,
@@ -1635,89 +1636,31 @@
             await signInAnonymously(auth);
             console.log("Conectado ao Firebase.");
 
-            // Sincronização e Migração Inicial
-            await this.syncData();
+            // Carrega usuários (uma vez é suficiente para auth)
+            await this.syncUsers();
+
+            // Inicia Listener em Tempo Real para Itens
+            // Retorna uma promessa que resolve apenas quando os primeiros dados chegarem
+            await new Promise((resolve) => {
+              this.setupRealtimeListener(resolve);
+            });
           } catch (e) {
             console.error("Erro ao conectar Firebase:", e);
             alert("Erro ao conectar ao banco de dados. Verifique sua conexão.");
           }
         },
 
-        async syncData() {
+        async syncUsers() {
           const usersRef = collection(db, "users");
-          const itemsRef = collection(db, "items");
-
           const usersSnap = await getDocs(usersRef);
-          const itemsSnap = await getDocs(itemsRef);
-
-          // Migração: Se o banco estiver vazio, enviar dados locais ou sementes
-          if (itemsSnap.empty) {
-            document.getElementById("loading-text").innerText =
-              "Migrando dados para a nuvem...";
-            // Tenta pegar do LocalStorage antigo
-            const localItems = JSON.parse(
-              localStorage.getItem("serob_db_items"),
-            );
-            const itemsToUpload = localItems || SEED_ITEMS;
-
-            const batch = writeBatch(db);
-            itemsToUpload.forEach((item) => {
-              const docRef = doc(db, "items", String(item.id));
-              batch.set(docRef, item);
-            });
-            await batch.commit();
-            this.items = itemsToUpload;
-          } else {
-            this.items = itemsSnap.docs.map((d) => d.data());
-
-            // --- MIGRAÇÃO DE DADOS (Backfill) ---
-            // Verifica se itens existentes precisam de atualização com novos campos
-            const batch = writeBatch(db);
-            let hasUpdates = false;
-
-            this.items.forEach((item) => {
-              // Encontra o dado "Semente" correspondente para pegar os valores padrão
-              const seed = SEED_ITEMS.find((s) => s.id === item.id);
-              if (seed) {
-                let updated = false;
-                // Adiciona qtdRessuprimento se faltar
-                if (item.qtdRessuprimento === undefined) {
-                  item.qtdRessuprimento = seed.qtdRessuprimento;
-                  updated = true;
-                }
-                // Garante estoqueMinimo se faltar
-                if (item.estoqueMinimo === undefined) {
-                  item.estoqueMinimo = seed.estoqueMinimo;
-                  updated = true;
-                }
-
-                if (updated) {
-                  const docRef = doc(db, "items", String(item.id));
-                  batch.update(docRef, {
-                    qtdRessuprimento: item.qtdRessuprimento,
-                    estoqueMinimo: item.estoqueMinimo,
-                  });
-                  hasUpdates = true;
-                }
-              }
-            });
-
-            if (hasUpdates) {
-              console.log("Aplicando migração de campos novos...");
-              await batch.commit();
-            }
-          }
 
           if (usersSnap.empty) {
-            // Tenta pegar do LocalStorage antigo
             const localUsers = JSON.parse(
               localStorage.getItem("serob_db_users"),
             );
             const usersToUpload = localUsers || SEED_USERS;
-
             const batch = writeBatch(db);
             for (const user of usersToUpload) {
-              // Garante hash se vier do storage antigo
               if (user.password && !user.passwordHash) {
                 user.passwordHash = await SecurityUtils.hash(user.password);
                 delete user.password;
@@ -1732,6 +1675,81 @@
           }
         },
 
+        setupRealtimeListener(onFirstLoad) {
+          const itemsRef = collection(db, "items");
+
+          // onSnapshot escuta mudanças em tempo real
+          onSnapshot(itemsRef, async (snapshot) => {
+            if (snapshot.empty) {
+              // Se vazio, faz o seed inicial
+              document.getElementById("loading-text").innerText =
+                "Criando banco de dados...";
+              const localItems = JSON.parse(
+                localStorage.getItem("serob_db_items"),
+              );
+              const itemsToUpload = localItems || SEED_ITEMS;
+              const batch = writeBatch(db);
+              itemsToUpload.forEach((item) => {
+                const docRef = doc(db, "items", String(item.id));
+                batch.set(docRef, item);
+              });
+              await batch.commit();
+              // O snapshot vai disparar novamente com os dados inseridos
+            } else {
+              // Atualiza a lista local com os dados novos do Firebase
+              this.items = snapshot.docs.map((d) => d.data());
+
+              // Verifica migração de campos novos (Ressuprimento/Mínimo)
+              this.checkAndMigrateItems();
+
+              // Atualiza a interface do usuário imediatamente
+              if (window.App && typeof window.App.refreshUI === "function") {
+                window.App.refreshUI();
+              }
+
+              // Se for a primeira carga, resolve a promessa do init
+              if (onFirstLoad) {
+                onFirstLoad();
+                onFirstLoad = null; // Garante que só chama uma vez
+              }
+            }
+          });
+        },
+
+        checkAndMigrateItems() {
+          const batch = writeBatch(db);
+          let hasUpdates = false;
+
+          this.items.forEach((item) => {
+            const seed = SEED_ITEMS.find((s) => s.id === item.id);
+            if (seed) {
+              let updated = false;
+              if (item.qtdRessuprimento === undefined) {
+                item.qtdRessuprimento = seed.qtdRessuprimento;
+                updated = true;
+              }
+              if (item.estoqueMinimo === undefined) {
+                item.estoqueMinimo = seed.estoqueMinimo;
+                updated = true;
+              }
+
+              if (updated) {
+                const docRef = doc(db, "items", String(item.id));
+                batch.update(docRef, {
+                  qtdRessuprimento: item.qtdRessuprimento,
+                  estoqueMinimo: item.estoqueMinimo,
+                });
+                hasUpdates = true;
+              }
+            }
+          });
+
+          if (hasUpdates) {
+            console.log("Sincronizando novos campos...");
+            batch.commit();
+          }
+        },
+
         async updateStock(id, qty, type) {
           const itemIndex = this.items.findIndex((i) => i.id === id);
           if (itemIndex === -1) return false;
@@ -1741,18 +1759,16 @@
           if (type === "entrada") newStock += qty;
           else newStock = Math.max(0, newStock - qty);
 
-          // Atualiza localmente para rapidez
-          this.items[itemIndex].estoque = newStock;
+          // NÃO atualizamos this.items manualmente aqui.
+          // Esperamos o Firebase confirmar e mandar o onSnapshot atualizar a tela.
+          // Isso garante que o dado na tela é REAL.
 
-          // Atualiza no Firestore
           try {
             const itemRef = doc(db, "items", String(id));
             await updateDoc(itemRef, { estoque: newStock });
             return true;
           } catch (e) {
             console.error("Erro ao salvar no Firebase:", e);
-            // Reverte local em caso de erro?
-            // Por simplicidade, mantemos assim e avisamos o usuário se falhar
             return false;
           }
         },
@@ -2076,13 +2092,15 @@
         currentTab: "dashboard",
 
         async init() {
-          // Inicializa Firebase primeiro
+          // Restore session FIRST so currentUser is available if logged in
+          AuthService.restoreSession();
+
+          // Inicializa Firebase
           await FirestoreService.init();
 
           // Remove tela de loading
           document.getElementById("loading-screen").classList.add("hidden");
 
-          AuthService.restoreSession();
           const loginForm = document.getElementById("login-form");
           if (loginForm)
             loginForm.addEventListener("submit", AuthController.handleLogin);
@@ -2093,6 +2111,29 @@
             document.getElementById("login-layout").classList.remove("hidden");
           }
           lucide.createIcons();
+        },
+
+        refreshUI() {
+          // Only refresh if user is logged in, otherwise UI is Login Screen
+          if (!AuthService.getCurrentUser()) return;
+
+          // Re-renderiza a tela atual com os dados novos
+          if (this.currentTab === "dashboard") {
+            this.renderDashboard();
+          } else {
+            // Se estiver em movimentações, atualiza a tabela preservando filtros
+            this.renderTableRows();
+          }
+        },
+
+        resetData() {
+          if (
+            confirm(
+              "ATENÇÃO: Isso irá apagar todos os dados no Firebase e restaurar os itens originais. Deseja continuar?",
+            )
+          ) {
+            FirestoreService.resetData();
+          }
         },
 
         initLayout() {
@@ -2165,6 +2206,10 @@
         // --- Renderers ---
         renderDashboard() {
           const container = document.getElementById("content-area");
+          // Guard clause: if user is not logged in, do not attempt to render
+          const user = AuthService.getCurrentUser();
+          if (!user) return;
+
           const stats = {
             totalItems: FirestoreService.items.length,
             lowStock: FirestoreService.items.filter(
@@ -2178,7 +2223,7 @@
               ...new Set(FirestoreService.items.map((i) => i.categoria)),
             ].length,
           };
-          const user = AuthService.getCurrentUser();
+
           const h = new Date().getHours();
           const greeting =
             h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
@@ -2348,6 +2393,9 @@
 
         renderMovementsLayout() {
           const container = document.getElementById("content-area");
+          // Guard clause for safety
+          if (!AuthService.getCurrentUser()) return;
+
           const categories = [
             "Todas",
             "DEPÓSITO C4 - GÁS",
