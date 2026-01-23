@@ -25,7 +25,7 @@
     />
 
     <!-- Configurações Tailwind -->
-<script>
+    <script>
       tailwind.config = {
         theme: {
           extend: {
@@ -843,7 +843,8 @@
         </div>
         <form onsubmit="App.changePassword(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+            <label
+              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
               >Senha Atual</label
             >
             <input
@@ -855,7 +856,8 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+            <label
+              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
               >Nova Senha</label
             >
             <input
@@ -867,7 +869,8 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+            <label
+              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
               >Confirmar Senha</label
             >
             <input
@@ -909,9 +912,13 @@
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
-        <form onsubmit="AuthController.handleResetPassword(event)" class="space-y-4">
+        <form
+          onsubmit="AuthController.handleResetPassword(event)"
+          class="space-y-4"
+        >
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+            <label
+              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
               >Usuário</label
             >
             <input
@@ -923,7 +930,8 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+            <label
+              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
               >Nova Senha</label
             >
             <input
@@ -935,7 +943,8 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+            <label
+              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
               >Confirmar Senha</label
             >
             <input
@@ -958,7 +967,7 @@
 
     <!-- ================== SCRIPT ENGINE ================== -->
     <script type="module">
-      'use strict';
+      "use strict";
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import {
         getFirestore,
@@ -5867,7 +5876,10 @@
             this.setupMovementsListener();
           } catch (e) {
             console.error("Erro ao conectar Firebase:", e);
-            ToastManager.show("Erro ao conectar ao banco de dados. Verifique sua conexão.", "error");
+            ToastManager.show(
+              "Erro ao conectar ao banco de dados. Verifique sua conexão.",
+              "error",
+            );
           }
         },
 
@@ -5875,12 +5887,21 @@
           const usersRef = collection(db, "users");
           const usersSnap = await getDocs(usersRef);
 
-          if (usersSnap.empty) {
-            const localUsers = JSON.parse(
-              localStorage.getItem("serob_db_users"),
+          // Carrega cache local (quando existir) para manter alterações no dispositivo
+          // mesmo se as regras do Firestore impedirem update remoto.
+          let localUsers = null;
+          try {
+            localUsers = JSON.parse(
+              localStorage.getItem("serob_db_users") || "null",
             );
+          } catch (_) {
+            localUsers = null;
+          }
+
+          if (usersSnap.empty) {
             const usersToUpload = localUsers || SEED_USERS;
             const batch = writeBatch(db);
+
             for (const user of usersToUpload) {
               if (user.password && !user.passwordHash) {
                 user.passwordHash = await SecurityUtils.hash(user.password);
@@ -5889,11 +5910,63 @@
               const docRef = doc(db, "users", user.username);
               batch.set(docRef, user);
             }
+
             await batch.commit();
             this.users = usersToUpload;
-          } else {
-            this.users = usersSnap.docs.map((d) => d.data());
+
+            // Atualiza o cache local
+            try {
+              localStorage.setItem(
+                "serob_db_users",
+                JSON.stringify(this.users),
+              );
+            } catch (_) {}
+            return;
           }
+
+          // Firestore possui dados: usa como base
+          const remoteUsers = usersSnap.docs.map((d) => d.data());
+
+          // Mescla cache local por username (prioriza local para passwordHash)
+          if (Array.isArray(localUsers) && localUsers.length) {
+            const byUsername = new Map(remoteUsers.map((u) => [u.username, u]));
+            for (const lu of localUsers) {
+              if (!lu || !lu.username) continue;
+              const ru = byUsername.get(lu.username);
+              if (!ru) continue;
+
+              // Se o cache local tem passwordHash diferente, assume que é a versão válida do dispositivo
+              if (lu.passwordHash && lu.passwordHash !== ru.passwordHash) {
+                ru.passwordHash = lu.passwordHash;
+
+                // Tenta reconciliar no Firestore (best-effort; não bloqueia)
+                try {
+                  await updateDoc(doc(db, "users", lu.username), {
+                    passwordHash: lu.passwordHash,
+                  });
+                } catch (e) {
+                  console.warn(
+                    "Sem permissão para atualizar passwordHash no Firestore (mantendo no cache local).",
+                    e,
+                  );
+                }
+              }
+
+              // Mescla outros campos úteis (sem sobrescrever remoto com undefined)
+              const mergeFields = ["name", "role"];
+              for (const f of mergeFields) {
+                if (typeof lu[f] !== "undefined" && lu[f] !== null)
+                  ru[f] = lu[f];
+              }
+            }
+          }
+
+          this.users = remoteUsers;
+
+          // Regrava cache local com a versão em memória
+          try {
+            localStorage.setItem("serob_db_users", JSON.stringify(this.users));
+          } catch (_) {}
         },
 
         /**
@@ -5912,7 +5985,11 @@
                 return { id: d.id, ...data };
               });
               // Se estivermos na aba de pesquisa de movimentação, atualiza a UI
-              if (window.InventoryController && window.App && App.currentTab === "movement-search") {
+              if (
+                window.InventoryController &&
+                window.App &&
+                App.currentTab === "movement-search"
+              ) {
                 InventoryController.renderMovementRows();
               }
             });
@@ -6014,7 +6091,8 @@
               if (!snap.exists()) throw new Error("Item não encontrado");
               const data = snap.data() || {};
               const before = Number(data.estoque) || 0;
-              const after = type === "entrada" ? before + qty : Math.max(0, before - qty);
+              const after =
+                type === "entrada" ? before + qty : Math.max(0, before - qty);
               tx.update(itemRef, { estoque: after });
               tx.set(movRef, {
                 itemId: String(id),
@@ -6044,18 +6122,31 @@
         },
 
         async updateUserPassword(username, newHash) {
+          // Atualiza senha localmente e tenta persistir no Firestore.
+          // Mesmo que o Firestore falhe (regras/permissão), mantemos o cache local
+          // para que o login funcione após recarregar/sair.
+          const userIndex = this.users.findIndex(
+            (u) => u.username === username,
+          );
+          if (userIndex > -1) this.users[userIndex].passwordHash = newHash;
+
           try {
-            const userRef = doc(db, "users", username);
-            await updateDoc(userRef, { passwordHash: newHash });
-            const userIndex = this.users.findIndex(
-              (u) => u.username === username,
-            );
-            if (userIndex > -1) this.users[userIndex].passwordHash = newHash;
-            return true;
-          } catch (e) {
-            console.error(e);
-            return false;
-          }
+            localStorage.setItem("serob_db_users", JSON.stringify(this.users));
+          } catch (_) {}
+
+          (async () => {
+            try {
+              const userRef = doc(db, "users", username);
+              await updateDoc(userRef, { passwordHash: newHash });
+            } catch (e) {
+              console.warn(
+                "Falha ao atualizar senha no Firestore (mantendo em cache local).",
+                e,
+              );
+            }
+          })();
+
+          return userIndex > -1;
         },
 
         async importItems(newItems) {
@@ -6127,10 +6218,7 @@
           const inputHash = await SecurityUtils.hash(password);
           if (targetUser.passwordHash === inputHash) {
             this.state.currentUser = targetUser;
-            localStorage.setItem(
-              "serob_session",
-              JSON.stringify(targetUser),
-            );
+            localStorage.setItem("serob_session", JSON.stringify(targetUser));
             return true;
           }
           return false;
@@ -6239,20 +6327,24 @@
         // Formata quantidade conforme locale pt-BR com até 2 casas decimais
         fmtQty(n) {
           const v = this.round2(n);
-          return v.toLocaleString('pt-BR', {
+          return v.toLocaleString("pt-BR", {
             minimumFractionDigits: 0,
             maximumFractionDigits: 2,
           });
         },
         // Escapa caracteres HTML especiais para evitar XSS
-        escapeHTML(str = '') {
-          return String(str).replace(/[&<>"']/g, (m) => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;',
-          })[m]);
+        escapeHTML(str = "") {
+          return String(str).replace(
+            /[&<>"']/g,
+            (m) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[m],
+          );
         },
         // Debounce simples para evitar chamadas excessivas
         debounce(fn, delay = 300) {
@@ -6285,7 +6377,10 @@
             }
           } catch (err) {
             console.error(err);
-            ToastManager.show("Erro ao fazer login. Verifique o console.", "error");
+            ToastManager.show(
+              "Erro ao fazer login. Verifique o console.",
+              "error",
+            );
           } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -6379,25 +6474,47 @@
                 // Remove diacríticos (acentos) utilizando faixa unicode genérica
                 .replace(/[\u0300-\u036f]/g, "");
             const searchKey = normalize(username);
-            const userIndex = FirestoreService.users.findIndex((u) => {
+            // Encontra todos os usuários cujo username ou primeiro nome
+            // (removendo acentos) correspondam à chave de busca.
+            const matchingIndexes = [];
+            FirestoreService.users.forEach((u, idx) => {
               const normalizedUsername = normalize(u.username);
               const normalizedFirstName = normalize(
                 (u.name || "").split(" ")[0],
               );
-              return (
+              if (
                 normalizedUsername === searchKey ||
                 normalizedFirstName === searchKey
-              );
+              ) {
+                matchingIndexes.push(idx);
+              }
             });
-            if (userIndex < 0) {
+            if (matchingIndexes.length === 0) {
               ToastManager.show(
                 "Usuário não encontrado para redefinir senha.",
                 "error",
               );
               return;
             }
-            // Atualiza senha em memória
-            FirestoreService.users[userIndex].passwordHash = newHash;
+            // Atualiza senha em memória para todos os usuários encontrados
+            for (const idx of matchingIndexes) {
+              FirestoreService.users[idx].passwordHash = newHash;
+              // Tenta atualizar no Firestore (não bloqueante). Usa o username real do
+              // usuário encontrado para que o documento seja atualizado mesmo que o
+              // valor digitado contenha acentos ou abreviações.
+              try {
+                const targetUsername = FirestoreService.users[idx].username;
+                await FirestoreService.updateUserPassword(
+                  targetUsername,
+                  newHash,
+                );
+              } catch (remoteErr) {
+                console.warn(
+                  `Falha ao atualizar senha no Firestore para ${FirestoreService.users[idx].username}:`,
+                  remoteErr,
+                );
+              }
+            }
             // Persiste em localStorage caso o cache seja utilizado
             try {
               localStorage.setItem(
@@ -6407,17 +6524,7 @@
             } catch (lsErr) {
               console.error("Não foi possível salvar no localStorage:", lsErr);
             }
-            // Tenta atualizar no Firestore (não bloqueante). Usa o username real do
-            // usuário encontrado para que o documento seja atualizado mesmo que o
-            // valor digitado contenha acentos ou abreviações.
-            try {
-              const targetUsername = FirestoreService.users[userIndex].username;
-              await FirestoreService.updateUserPassword(targetUsername, newHash);
-            } catch (remoteErr) {
-              console.warn("Falha ao atualizar senha no Firestore:", remoteErr);
-            }
-            // Pronto, concluído
-            // Notifica o usuário e fecha o modal. Não recarregamos a página
+            // Concluído: notifica o usuário e fecha o modal. Não recarregamos a página
             // para que o novo hash permaneça em memória (FirestoreService.users)
             // e o login funcione imediatamente com a nova senha.
             ToastManager.show(
@@ -6427,10 +6534,7 @@
             e.target.reset();
           } catch (err) {
             console.error(err);
-            ToastManager.show(
-              "Erro inesperado ao redefinir senha.",
-              "error",
-            );
+            ToastManager.show("Erro inesperado ao redefinir senha.", "error");
           } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -6491,7 +6595,7 @@
         // Atualiza automaticamente os campos de cadastro quando um código de contrato já existente é digitado
         handleCodigoChange(e) {
           // Valor digitado no campo de código de contrato
-          const code = (e.target.value || '').trim();
+          const code = (e.target.value || "").trim();
           if (!code) return;
           // Procura item pelo campo codigo (contrato)
           const found = FirestoreService.items.find((item) => {
@@ -6502,26 +6606,26 @@
           });
           if (found) {
             // Preenche a descrição
-            const descInput = document.getElementById('new-descricao');
+            const descInput = document.getElementById("new-descricao");
             if (descInput) {
-              descInput.value = found.descricao || '';
+              descInput.value = found.descricao || "";
             }
             // Preenche o código interno
-            const internoInput = document.getElementById('new-codigo-interno');
+            const internoInput = document.getElementById("new-codigo-interno");
             if (internoInput) {
-              internoInput.value = found.codigoInterno || '';
+              internoInput.value = found.codigoInterno || "";
             }
             // Preenche a categoria se existir
-            const categoriaSelect = document.getElementById('new-categoria');
+            const categoriaSelect = document.getElementById("new-categoria");
             if (categoriaSelect) {
-              const catVal = found.categoria || '';
+              const catVal = found.categoria || "";
               if (catVal) {
                 let optionExists = false;
                 Array.from(categoriaSelect.options).forEach((opt) => {
                   if (opt.value === catVal) optionExists = true;
                 });
                 if (!optionExists) {
-                  const opt = document.createElement('option');
+                  const opt = document.createElement("option");
                   opt.value = catVal;
                   opt.textContent = catVal;
                   categoriaSelect.appendChild(opt);
@@ -6530,47 +6634,48 @@
               }
             }
             // Preenche a unidade (tipo de unidade) se existir
-            const unidadeInput = document.getElementById('new-unidade');
+            const unidadeInput = document.getElementById("new-unidade");
             if (unidadeInput) {
-              unidadeInput.value = found.unidade || '';
+              unidadeInput.value = found.unidade || "";
             }
           }
         },
         // Atualiza automaticamente os campos de cadastro quando um código interno já existente é digitado
         handleCodigoInternoChange(e) {
           // Valor digitado pelo usuário no campo de código interno
-          const code = (e.target.value || '').trim();
+          const code = (e.target.value || "").trim();
           if (!code) return;
           // Procura um item existente no serviço com o mesmo código interno (ignora maiúsculas/minúsculas)
           const found = FirestoreService.items.find((item) => {
             return (
               item.codigoInterno &&
-              String(item.codigoInterno).trim().toUpperCase() === code.toUpperCase()
+              String(item.codigoInterno).trim().toUpperCase() ===
+                code.toUpperCase()
             );
           });
           if (found) {
             // Preenche a descrição do material se existir
-            const descInput = document.getElementById('new-descricao');
+            const descInput = document.getElementById("new-descricao");
             if (descInput) {
-              descInput.value = found.descricao || '';
+              descInput.value = found.descricao || "";
             }
             // Preenche o código do contrato (campo "Código") se existir
-            const codigoInput = document.getElementById('new-codigo');
+            const codigoInput = document.getElementById("new-codigo");
             if (codigoInput) {
-              codigoInput.value = found.codigo || '';
+              codigoInput.value = found.codigo || "";
             }
             // Preenche a categoria se existir
-            const categoriaSelect = document.getElementById('new-categoria');
+            const categoriaSelect = document.getElementById("new-categoria");
             if (categoriaSelect) {
               // se o valor não existir nas opções, adiciona temporariamente
-              const catVal = found.categoria || '';
+              const catVal = found.categoria || "";
               if (catVal) {
                 let optionExists = false;
                 Array.from(categoriaSelect.options).forEach((opt) => {
                   if (opt.value === catVal) optionExists = true;
                 });
                 if (!optionExists) {
-                  const opt = document.createElement('option');
+                  const opt = document.createElement("option");
                   opt.value = catVal;
                   opt.textContent = catVal;
                   categoriaSelect.appendChild(opt);
@@ -6579,9 +6684,9 @@
               }
             }
             // Preenche a unidade (tipo de unidade) se existir
-            const unidadeInput = document.getElementById('new-unidade');
+            const unidadeInput = document.getElementById("new-unidade");
             if (unidadeInput) {
-              unidadeInput.value = found.unidade || '';
+              unidadeInput.value = found.unidade || "";
             }
           }
         },
@@ -6745,9 +6850,15 @@
           const tbody = document.getElementById("movements-body");
           if (!tbody) return;
           // Obtém valores de filtro
-          const searchTerm = (document.getElementById("mov-search-term")?.value || "").trim().toLowerCase();
-          const typeFilter = document.getElementById("mov-type-filter")?.value || "";
-          const dateFromVal = document.getElementById("mov-date-from")?.value || "";
+          const searchTerm = (
+            document.getElementById("mov-search-term")?.value || ""
+          )
+            .trim()
+            .toLowerCase();
+          const typeFilter =
+            document.getElementById("mov-type-filter")?.value || "";
+          const dateFromVal =
+            document.getElementById("mov-date-from")?.value || "";
           const dateToVal = document.getElementById("mov-date-to")?.value || "";
           const fromDate = dateFromVal ? new Date(dateFromVal) : null;
           const toDate = dateToVal ? new Date(dateToVal) : null;
@@ -6756,13 +6867,31 @@
             let ok = true;
             // Termo de busca: verifica descrição, código ou interno
             if (searchTerm) {
-              const desc = (mov.itemDescricao || mov.descricao || "").toString().toLowerCase();
-              const cod = (mov.itemCodigo || mov.codigo || "").toString().toLowerCase();
-              const interno = (mov.itemCodigoInterno || mov.codigoInterno || "").toString().toLowerCase();
-              if (!(desc.includes(searchTerm) || cod.includes(searchTerm) || interno.includes(searchTerm))) ok = false;
+              const desc = (mov.itemDescricao || mov.descricao || "")
+                .toString()
+                .toLowerCase();
+              const cod = (mov.itemCodigo || mov.codigo || "")
+                .toString()
+                .toLowerCase();
+              const interno = (mov.itemCodigoInterno || mov.codigoInterno || "")
+                .toString()
+                .toLowerCase();
+              if (
+                !(
+                  desc.includes(searchTerm) ||
+                  cod.includes(searchTerm) ||
+                  interno.includes(searchTerm)
+                )
+              )
+                ok = false;
             }
             // Tipo (entrada/saida)
-            if (typeFilter && mov.type && mov.type.toString().toLowerCase() !== typeFilter) ok = false;
+            if (
+              typeFilter &&
+              mov.type &&
+              mov.type.toString().toLowerCase() !== typeFilter
+            )
+              ok = false;
             // Datas
             if ((fromDate || toDate) && mov.createdAt) {
               let movDate;
@@ -6784,7 +6913,11 @@
           // Ordena por data decrescente (mais recente primeiro)
           list.sort((a, b) => {
             const getTime = (m) => {
-              if (m.createdAt && typeof m.createdAt === "object" && m.createdAt.seconds) {
+              if (
+                m.createdAt &&
+                typeof m.createdAt === "object" &&
+                m.createdAt.seconds
+              ) {
                 return m.createdAt.seconds;
               }
               return new Date(m.createdAt || 0).getTime() / 1000;
@@ -6800,7 +6933,10 @@
               let dateStr = "";
               if (mov.createdAt) {
                 let dt;
-                if (typeof mov.createdAt === "object" && mov.createdAt.seconds) {
+                if (
+                  typeof mov.createdAt === "object" &&
+                  mov.createdAt.seconds
+                ) {
                   dt = new Date(mov.createdAt.seconds * 1000);
                 } else {
                   dt = new Date(mov.createdAt);
@@ -7033,10 +7169,13 @@
             0,
           );
           const totalRoundedStock = Math.round(totalRawStock * 100) / 100;
-          const totalStockFormatted = totalRoundedStock.toLocaleString("pt-BR", {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
-          });
+          const totalStockFormatted = totalRoundedStock.toLocaleString(
+            "pt-BR",
+            {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2,
+            },
+          );
           const stats = {
             totalItems: FirestoreService.items.length,
             lowStock: FirestoreService.items.filter(
@@ -7414,7 +7553,7 @@
                 new Set(
                   (FirestoreService.items || [])
                     .map((item) => item.categoria)
-                    .filter((c) => c && typeof c === "string")
+                    .filter((c) => c && typeof c === "string"),
                 ),
               );
               // Remove a categoria "DEPÓSITO GERAL" se presente
@@ -7430,7 +7569,8 @@
             }
           })();
           // Adiciona listener para atualizar descrição ao digitar o código interno
-          const codigoInternoInput = document.getElementById("new-codigo-interno");
+          const codigoInternoInput =
+            document.getElementById("new-codigo-interno");
           if (codigoInternoInput) {
             // Usa evento 'input' com debounce para atualizar em tempo real sem sobrecarregar
             codigoInternoInput.addEventListener(
