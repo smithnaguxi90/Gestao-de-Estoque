@@ -25,7 +25,7 @@
     />
 
     <!-- Configurações Tailwind -->
-    <script>
+<script>
       tailwind.config = {
         theme: {
           extend: {
@@ -810,8 +810,77 @@
       </div>
     </div>
 
+    <!-- Modal Alterar Senha -->
+    <div
+      id="modal-password"
+      class="fixed inset-0 bg-slate-900/60 z-50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0 pointer-events-none"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform scale-95 transition-all duration-300"
+      >
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 tracking-tight">
+              Alterar Senha
+            </h3>
+          </div>
+          <button
+            onclick="ModalManager.close('modal-password')"
+            class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded-full transition-colors"
+          >
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        <form onsubmit="App.changePassword(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+              >Senha Atual</label
+            >
+            <input
+              type="password"
+              id="pwd-current"
+              required
+              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              placeholder="Digite a senha atual"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+              >Nova Senha</label
+            >
+            <input
+              type="password"
+              id="pwd-new"
+              required
+              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              placeholder="Digite a nova senha"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+              >Confirmar Senha</label
+            >
+            <input
+              type="password"
+              id="pwd-confirm"
+              required
+              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              placeholder="Confirme a nova senha"
+            />
+          </div>
+          <button
+            type="submit"
+            class="w-full px-4 py-3 rounded-lg bg-brand-600 text-white font-bold shadow-lg hover:bg-brand-700 transition-all transform active:scale-95"
+          >
+            Salvar Senha
+          </button>
+        </form>
+      </div>
+    </div>
+
     <!-- ================== SCRIPT ENGINE ================== -->
     <script type="module">
+      'use strict';
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import {
         getFirestore,
@@ -5715,7 +5784,7 @@
             this.setupMovementsListener();
           } catch (e) {
             console.error("Erro ao conectar Firebase:", e);
-            alert("Erro ao conectar ao banco de dados. Verifique sua conexão.");
+            ToastManager.show("Erro ao conectar ao banco de dados. Verifique sua conexão.", "error");
           }
         },
 
@@ -5760,11 +5829,7 @@
                 return { id: d.id, ...data };
               });
               // Se estivermos na aba de pesquisa de movimentação, atualiza a UI
-              if (
-                window.InventoryController &&
-                window.App &&
-                App.currentTab === "movement-search"
-              ) {
+              if (window.InventoryController && window.App && App.currentTab === "movement-search") {
                 InventoryController.renderMovementRows();
               }
             });
@@ -6034,6 +6099,47 @@
         },
       };
 
+      // --- Utilidades Reutilizáveis ---
+      // Esta coleção de funções auxiliares torna o código mais profissional
+      // e consistente ao lidar com números, formatação, escape de HTML e debounce.
+      const Utils = {
+        // Converte um valor em número, retornando fallback se não for numérico
+        num(value, fallback = 0) {
+          const n = Number(value);
+          return Number.isFinite(n) ? n : fallback;
+        },
+        // Arredonda um número para 2 casas decimais
+        round2(n) {
+          return Math.round(this.num(n) * 100) / 100;
+        },
+        // Formata quantidade conforme locale pt-BR com até 2 casas decimais
+        fmtQty(n) {
+          const v = this.round2(n);
+          return v.toLocaleString('pt-BR', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          });
+        },
+        // Escapa caracteres HTML especiais para evitar XSS
+        escapeHTML(str = '') {
+          return String(str).replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+          })[m]);
+        },
+        // Debounce simples para evitar chamadas excessivas
+        debounce(fn, delay = 300) {
+          let timeout;
+          return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn.apply(this, args), delay);
+          };
+        },
+      };
+
       // --- Controllers ---
       const AuthController = {
         async handleLogin(e) {
@@ -6055,7 +6161,7 @@
             }
           } catch (err) {
             console.error(err);
-            alert("Erro ao fazer login. Verifique o console.");
+            ToastManager.show("Erro ao fazer login. Verifique o console.", "error");
           } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -6150,7 +6256,7 @@
         // Atualiza automaticamente os campos de cadastro quando um código de contrato já existente é digitado
         handleCodigoChange(e) {
           // Valor digitado no campo de código de contrato
-          const code = (e.target.value || "").trim();
+          const code = (e.target.value || '').trim();
           if (!code) return;
           // Procura item pelo campo codigo (contrato)
           const found = FirestoreService.items.find((item) => {
@@ -6161,40 +6267,86 @@
           });
           if (found) {
             // Preenche a descrição
-            const descInput = document.getElementById("new-descricao");
+            const descInput = document.getElementById('new-descricao');
             if (descInput) {
-              descInput.value = found.descricao || "";
+              descInput.value = found.descricao || '';
             }
             // Preenche o código interno
-            const internoInput = document.getElementById("new-codigo-interno");
+            const internoInput = document.getElementById('new-codigo-interno');
             if (internoInput) {
-              internoInput.value = found.codigoInterno || "";
+              internoInput.value = found.codigoInterno || '';
+            }
+            // Preenche a categoria se existir
+            const categoriaSelect = document.getElementById('new-categoria');
+            if (categoriaSelect) {
+              const catVal = found.categoria || '';
+              if (catVal) {
+                let optionExists = false;
+                Array.from(categoriaSelect.options).forEach((opt) => {
+                  if (opt.value === catVal) optionExists = true;
+                });
+                if (!optionExists) {
+                  const opt = document.createElement('option');
+                  opt.value = catVal;
+                  opt.textContent = catVal;
+                  categoriaSelect.appendChild(opt);
+                }
+                categoriaSelect.value = catVal;
+              }
+            }
+            // Preenche a unidade (tipo de unidade) se existir
+            const unidadeInput = document.getElementById('new-unidade');
+            if (unidadeInput) {
+              unidadeInput.value = found.unidade || '';
             }
           }
         },
         // Atualiza automaticamente os campos de cadastro quando um código interno já existente é digitado
         handleCodigoInternoChange(e) {
           // Valor digitado pelo usuário no campo de código interno
-          const code = (e.target.value || "").trim();
+          const code = (e.target.value || '').trim();
           if (!code) return;
           // Procura um item existente no serviço com o mesmo código interno (ignora maiúsculas/minúsculas)
           const found = FirestoreService.items.find((item) => {
             return (
               item.codigoInterno &&
-              String(item.codigoInterno).trim().toUpperCase() ===
-                code.toUpperCase()
+              String(item.codigoInterno).trim().toUpperCase() === code.toUpperCase()
             );
           });
           if (found) {
             // Preenche a descrição do material se existir
-            const descInput = document.getElementById("new-descricao");
+            const descInput = document.getElementById('new-descricao');
             if (descInput) {
-              descInput.value = found.descricao || "";
+              descInput.value = found.descricao || '';
             }
             // Preenche o código do contrato (campo "Código") se existir
-            const codigoInput = document.getElementById("new-codigo");
+            const codigoInput = document.getElementById('new-codigo');
             if (codigoInput) {
-              codigoInput.value = found.codigo || "";
+              codigoInput.value = found.codigo || '';
+            }
+            // Preenche a categoria se existir
+            const categoriaSelect = document.getElementById('new-categoria');
+            if (categoriaSelect) {
+              // se o valor não existir nas opções, adiciona temporariamente
+              const catVal = found.categoria || '';
+              if (catVal) {
+                let optionExists = false;
+                Array.from(categoriaSelect.options).forEach((opt) => {
+                  if (opt.value === catVal) optionExists = true;
+                });
+                if (!optionExists) {
+                  const opt = document.createElement('option');
+                  opt.value = catVal;
+                  opt.textContent = catVal;
+                  categoriaSelect.appendChild(opt);
+                }
+                categoriaSelect.value = catVal;
+              }
+            }
+            // Preenche a unidade (tipo de unidade) se existir
+            const unidadeInput = document.getElementById('new-unidade');
+            if (unidadeInput) {
+              unidadeInput.value = found.unidade || '';
             }
           }
         },
@@ -6358,15 +6510,9 @@
           const tbody = document.getElementById("movements-body");
           if (!tbody) return;
           // Obtém valores de filtro
-          const searchTerm = (
-            document.getElementById("mov-search-term")?.value || ""
-          )
-            .trim()
-            .toLowerCase();
-          const typeFilter =
-            document.getElementById("mov-type-filter")?.value || "";
-          const dateFromVal =
-            document.getElementById("mov-date-from")?.value || "";
+          const searchTerm = (document.getElementById("mov-search-term")?.value || "").trim().toLowerCase();
+          const typeFilter = document.getElementById("mov-type-filter")?.value || "";
+          const dateFromVal = document.getElementById("mov-date-from")?.value || "";
           const dateToVal = document.getElementById("mov-date-to")?.value || "";
           const fromDate = dateFromVal ? new Date(dateFromVal) : null;
           const toDate = dateToVal ? new Date(dateToVal) : null;
@@ -6375,31 +6521,13 @@
             let ok = true;
             // Termo de busca: verifica descrição, código ou interno
             if (searchTerm) {
-              const desc = (mov.itemDescricao || mov.descricao || "")
-                .toString()
-                .toLowerCase();
-              const cod = (mov.itemCodigo || mov.codigo || "")
-                .toString()
-                .toLowerCase();
-              const interno = (mov.itemCodigoInterno || mov.codigoInterno || "")
-                .toString()
-                .toLowerCase();
-              if (
-                !(
-                  desc.includes(searchTerm) ||
-                  cod.includes(searchTerm) ||
-                  interno.includes(searchTerm)
-                )
-              )
-                ok = false;
+              const desc = (mov.itemDescricao || mov.descricao || "").toString().toLowerCase();
+              const cod = (mov.itemCodigo || mov.codigo || "").toString().toLowerCase();
+              const interno = (mov.itemCodigoInterno || mov.codigoInterno || "").toString().toLowerCase();
+              if (!(desc.includes(searchTerm) || cod.includes(searchTerm) || interno.includes(searchTerm))) ok = false;
             }
             // Tipo (entrada/saida)
-            if (
-              typeFilter &&
-              mov.type &&
-              mov.type.toString().toLowerCase() !== typeFilter
-            )
-              ok = false;
+            if (typeFilter && mov.type && mov.type.toString().toLowerCase() !== typeFilter) ok = false;
             // Datas
             if ((fromDate || toDate) && mov.createdAt) {
               let movDate;
@@ -6421,11 +6549,7 @@
           // Ordena por data decrescente (mais recente primeiro)
           list.sort((a, b) => {
             const getTime = (m) => {
-              if (
-                m.createdAt &&
-                typeof m.createdAt === "object" &&
-                m.createdAt.seconds
-              ) {
+              if (m.createdAt && typeof m.createdAt === "object" && m.createdAt.seconds) {
                 return m.createdAt.seconds;
               }
               return new Date(m.createdAt || 0).getTime() / 1000;
@@ -6435,26 +6559,13 @@
           // Monta HTML das linhas
           const rows = list
             .map((mov) => {
-              // Função de escape de HTML para evitar XSS
-              const escapeHTML = (str) => {
-                return String(str || "").replace(/[&<>"']/g, (m) => {
-                  return {
-                    "&": "&amp;",
-                    "<": "&lt;",
-                    ">": "&gt;",
-                    '"': "&quot;",
-                    "'": "&#039;",
-                  }[m];
-                });
-              };
+              // Usa utilitário global de escape em vez de recriar função
+              const escapeHTML = (str) => Utils.escapeHTML(str);
               // Formata data/hora
               let dateStr = "";
               if (mov.createdAt) {
                 let dt;
-                if (
-                  typeof mov.createdAt === "object" &&
-                  mov.createdAt.seconds
-                ) {
+                if (typeof mov.createdAt === "object" && mov.createdAt.seconds) {
                   dt = new Date(mov.createdAt.seconds * 1000);
                 } else {
                   dt = new Date(mov.createdAt);
@@ -6468,24 +6579,23 @@
                 });
               }
               const qty = mov.qty || mov.quantidade || mov.qtd || 0;
-              const before = mov.before || mov.beforeStock || "";
-              const after = mov.after || mov.afterStock || "";
+              const before = mov.before || mov.beforeStock || 0;
+              const after = mov.after || mov.afterStock || 0;
               const tipo = mov.type || mov.tipo || "";
               const desc = mov.itemDescricao || mov.descricao || "";
               const cod = mov.itemCodigo || mov.codigo || "";
               const interno = mov.itemCodigoInterno || mov.codigoInterno || "";
-              const user =
-                (mov.user && (mov.user.username || mov.user.name)) || "";
+              const user = (mov.user && (mov.user.username || mov.user.name)) || "";
               const note = mov.note || mov.observacao || "";
               return `<tr class="hover:bg-slate-50 transition-colors">
                 <td class="px-4 py-3 whitespace-nowrap">${dateStr}</td>
                 <td class="px-4 py-3 text-center capitalize">${tipo}</td>
-                <td class="px-4 py-3 text-center">${qty}</td>
+                <td class="px-4 py-3 text-center">${Utils.fmtQty(qty)}</td>
                 <td class="px-4 py-3">${escapeHTML(desc)}</td>
                 <td class="px-4 py-3">${escapeHTML(cod)}</td>
                 <td class="px-4 py-3">${escapeHTML(interno)}</td>
-                <td class="px-4 py-3 text-center">${before}</td>
-                <td class="px-4 py-3 text-center">${after}</td>
+                <td class="px-4 py-3 text-center">${Utils.fmtQty(before)}</td>
+                <td class="px-4 py-3 text-center">${Utils.fmtQty(after)}</td>
                 <td class="px-4 py-3">${escapeHTML(user)}</td>
                 <td class="px-4 py-3">${escapeHTML(note)}</td>
               </tr>`;
@@ -6677,13 +6787,10 @@
             0,
           );
           const totalRoundedStock = Math.round(totalRawStock * 100) / 100;
-          const totalStockFormatted = totalRoundedStock.toLocaleString(
-            "pt-BR",
-            {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 2,
-            },
-          );
+          const totalStockFormatted = totalRoundedStock.toLocaleString("pt-BR", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          });
           const stats = {
             totalItems: FirestoreService.items.length,
             lowStock: FirestoreService.items.filter(
@@ -6997,10 +7104,10 @@
                     </select>
                   </div>
                   <div>
-                    <input type="date" id="mov-date-from" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-32 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
+                    <input type="date" id="mov-date-from" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-40 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
                   </div>
                     <div>
-                    <input type="date" id="mov-date-to" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-32 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
+                    <input type="date" id="mov-date-to" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-40 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
                   </div>
                 </div>
               </div>
@@ -7061,7 +7168,7 @@
                 new Set(
                   (FirestoreService.items || [])
                     .map((item) => item.categoria)
-                    .filter((c) => c && typeof c === "string"),
+                    .filter((c) => c && typeof c === "string")
                 ),
               );
               // Remove a categoria "DEPÓSITO GERAL" se presente
@@ -7077,19 +7184,26 @@
             }
           })();
           // Adiciona listener para atualizar descrição ao digitar o código interno
-          const codigoInternoInput =
-            document.getElementById("new-codigo-interno");
+          const codigoInternoInput = document.getElementById("new-codigo-interno");
           if (codigoInternoInput) {
-            codigoInternoInput.addEventListener("change", (e) => {
-              InventoryController.handleCodigoInternoChange(e);
-            });
+            // Usa evento 'input' com debounce para atualizar em tempo real sem sobrecarregar
+            codigoInternoInput.addEventListener(
+              "input",
+              Utils.debounce((e) => {
+                InventoryController.handleCodigoInternoChange(e);
+              }, 300),
+            );
           }
           // Adiciona listener para atualizar descrição e código interno ao digitar o código de contrato
           const codigoInput = document.getElementById("new-codigo");
           if (codigoInput) {
-            codigoInput.addEventListener("change", (e) => {
-              InventoryController.handleCodigoChange(e);
-            });
+            // Usa evento 'input' com debounce para atualizar em tempo real sem sobrecarregar
+            codigoInput.addEventListener(
+              "input",
+              Utils.debounce((e) => {
+                InventoryController.handleCodigoChange(e);
+              }, 300),
+            );
           }
           lucide.createIcons();
         },
