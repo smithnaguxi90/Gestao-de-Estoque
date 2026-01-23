@@ -575,20 +575,7 @@
             </div>
           </div>
         </div>
-        
-        <div class="mb-8">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Observação</label>
-          <textarea
-            id="modal-mov-note"
-            rows="3"
-            class="w-full px-4 py-3 text-sm font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-shadow resize-none"
-            placeholder="Ex.: retirada para obra X, devolução, ajuste, etc."
-          ></textarea>
-          <p class="text-xs text-slate-500 mt-2">
-            Esta observação ficará registrada no histórico de movimentações.
-          </p>
-        </div>
-<div class="flex gap-3">
+        <div class="flex gap-3">
           <button
             onclick="ModalManager.close('modal-movement')"
             class="flex-1 px-4 py-3 rounded-xl font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all"
@@ -819,41 +806,7 @@
               </div>
             </div>
           </div>
-        
-        <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row gap-3 justify-end">
-          <button
-            id="detail-btn-delete"
-            onclick="InventoryController.deleteCurrentItemFromDetails()"
-            class="sm:mr-auto px-4 py-3 rounded-xl font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all"
-          >
-            Excluir
-          </button>
-
-          <button
-            id="detail-btn-cancel"
-            onclick="InventoryController.cancelDetailsEdit()"
-            class="hidden px-4 py-3 rounded-xl font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all"
-          >
-            Cancelar edição
-          </button>
-
-          <button
-            id="detail-btn-edit"
-            onclick="InventoryController.enableDetailsEdit()"
-            class="px-4 py-3 rounded-xl font-bold bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all"
-          >
-            Editar
-          </button>
-
-          <button
-            id="detail-btn-save"
-            onclick="InventoryController.saveDetailsEdit()"
-            class="hidden px-4 py-3 rounded-xl font-bold bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all"
-          >
-            Salvar alterações
-          </button>
         </div>
-</div>
       </div>
     </div>
 
@@ -867,14 +820,8 @@
         setDoc,
         doc,
         updateDoc,
-        deleteDoc,
         writeBatch,
         onSnapshot,
-        query,
-        orderBy,
-        limit,
-        runTransaction,
-        serverTimestamp,
       } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       import {
         getAuth,
@@ -5753,6 +5700,7 @@
       const FirestoreService = {
         users: [],
         items: [],
+        // Movimentos registrados (entradas/saídas)
         movements: [],
 
         async init() {
@@ -5763,6 +5711,7 @@
             await new Promise((resolve) => {
               this.setupRealtimeListener(resolve);
             });
+            // Inicia listener de movimentações
             this.setupMovementsListener();
           } catch (e) {
             console.error("Erro ao conectar Firebase:", e);
@@ -5792,6 +5741,35 @@
             this.users = usersToUpload;
           } else {
             this.users = usersSnap.docs.map((d) => d.data());
+          }
+        },
+
+        /**
+         * Inicializa o listener em tempo real para a coleção de movimentações.
+         * Armazena os documentos no array FirestoreService.movements e, se
+         * a aba atual for de pesquisa de movimentação, renderiza novamente a lista.
+         */
+        setupMovementsListener() {
+          try {
+            const movRef = collection(db, "movements");
+            // Ordena por data decrescente, limitado a um número razoável de registros
+            const q = query(movRef, orderBy("createdAt", "desc"), limit(500));
+            onSnapshot(q, (snapshot) => {
+              this.movements = snapshot.docs.map((d) => {
+                const data = d.data() || {};
+                return { id: d.id, ...data };
+              });
+              // Se estivermos na aba de pesquisa de movimentação, atualiza a UI
+              if (
+                window.InventoryController &&
+                window.App &&
+                App.currentTab === "movement-search"
+              ) {
+                InventoryController.renderMovementRows();
+              }
+            });
+          } catch (e) {
+            console.error("Erro ao iniciar listener de movimentações:", e);
           }
         },
 
@@ -5832,8 +5810,6 @@
 
               this.checkAndMigrateItems();
 
-              localStorage.setItem("serob_db_items", JSON.stringify(this.items));
-
               if (window.App && typeof window.App.refreshUI === "function") {
                 window.App.refreshUI();
               }
@@ -5845,24 +5821,6 @@
             }
           });
         },
-
-setupMovementsListener() {
-  const movRef = collection(db, "movements");
-  const q = query(movRef, orderBy("createdAt", "desc"), limit(500));
-  onSnapshot(q, (snap) => {
-    this.movements = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    localStorage.setItem(
-      "serob_db_movements",
-      JSON.stringify(this.movements),
-    );
-    // Se estiver na aba "Pesquisa de Movimentação", atualiza a UI
-    if (window.App && typeof window.App.refreshUI === "function") {
-      window.App.refreshUI();
-    }
-  });
-},
-
-
 
         checkAndMigrateItems() {
           const batch = writeBatch(db);
@@ -5897,79 +5855,22 @@ setupMovementsListener() {
           if (hasUpdates) batch.commit();
         },
 
-        
-        async updateStock(id, qty, type, note = "") {
+        async updateStock(id, qty, type) {
+          const itemIndex = this.items.findIndex((i) => i.id === id);
+          if (itemIndex === -1) return false;
+          const item = this.items[itemIndex];
+          let newStock = item.estoque;
+          if (type === "entrada") newStock += qty;
+          else newStock = Math.max(0, newStock - qty);
           try {
-            const currentUser = AuthService.getCurrentUser();
             const itemRef = doc(db, "items", String(id));
-            const movRef = doc(collection(db, "movements")); // id automático
-
-            await runTransaction(db, async (tx) => {
-              const snap = await tx.get(itemRef);
-              if (!snap.exists()) throw new Error("Item não encontrado.");
-
-              const item = snap.data();
-              const before = Number(item.estoque || 0);
-              const qtyNum = Number(qty || 0);
-              if (!Number.isFinite(qtyNum) || qtyNum <= 0)
-                throw new Error("Quantidade inválida.");
-
-              const after =
-                type === "entrada" ? before + qtyNum : Math.max(0, before - qtyNum);
-
-              tx.update(itemRef, { estoque: after });
-
-              tx.set(movRef, {
-                itemId: String(id),
-                type: type === "entrada" ? "entrada" : "saida",
-                qty: qtyNum,
-                before,
-                after,
-                note: (note || "").toString().trim() || null,
-                createdAt: serverTimestamp(),
-                user: currentUser
-                  ? {
-                      username: currentUser.username,
-                      name: currentUser.name,
-                      label: currentUser.label,
-                      role: currentUser.role,
-                    }
-                  : null,
-                itemCodigo: item.codigo || null,
-                itemDescricao: item.descricao || null,
-                itemCategoria: item.categoria || null,
-              });
-            });
-
+            await updateDoc(itemRef, { estoque: newStock });
             return true;
           } catch (e) {
-            console.error("Erro ao salvar movimentação:", e);
+            console.error("Erro ao salvar no Firebase:", e);
             return false;
           }
         },
-
-        async updateItem(id, patch) {
-          try {
-            const itemRef = doc(db, "items", String(id));
-            await updateDoc(itemRef, patch);
-            return true;
-          } catch (e) {
-            console.error("Erro ao atualizar item:", e);
-            return false;
-          }
-        },
-
-        async deleteItem(id) {
-          try {
-            const itemRef = doc(db, "items", String(id));
-            await deleteDoc(itemRef);
-            return true;
-          } catch (e) {
-            console.error("Erro ao excluir item:", e);
-            return false;
-          }
-        },
-
 
         async updateUserPassword(username, newHash) {
           try {
@@ -6202,8 +6103,6 @@ setupMovementsListener() {
           activeModalType: "entrada",
           searchTerm: "",
           categoryFilter: "Todas",
-          detailModalItemId: null,
-          detailEditMode: false,
         },
         openMovementModal(itemId, type) {
           const item = FirestoreService.items.find(
@@ -6220,7 +6119,6 @@ setupMovementsListener() {
           document.getElementById("modal-mov-item").innerText = item.descricao;
           document.getElementById("modal-mov-current").innerText = item.estoque;
           document.getElementById("modal-mov-qty").value = 1;
-          document.getElementById("modal-mov-note").value = "";
           const btn = document.getElementById("modal-mov-confirm");
           btn.className = `flex-1 px-4 py-3 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-95 ${type === "entrada" ? "bg-green-600 hover:bg-green-700 shadow-green-600/20" : "bg-red-600 hover:bg-red-700 shadow-red-600/20"}`;
           this.calculateNewStock();
@@ -6249,10 +6147,60 @@ setupMovementsListener() {
           input.value = val;
           this.calculateNewStock();
         },
+        // Atualiza automaticamente os campos de cadastro quando um código de contrato já existente é digitado
+        handleCodigoChange(e) {
+          // Valor digitado no campo de código de contrato
+          const code = (e.target.value || "").trim();
+          if (!code) return;
+          // Procura item pelo campo codigo (contrato)
+          const found = FirestoreService.items.find((item) => {
+            return (
+              item.codigo &&
+              String(item.codigo).trim().toUpperCase() === code.toUpperCase()
+            );
+          });
+          if (found) {
+            // Preenche a descrição
+            const descInput = document.getElementById("new-descricao");
+            if (descInput) {
+              descInput.value = found.descricao || "";
+            }
+            // Preenche o código interno
+            const internoInput = document.getElementById("new-codigo-interno");
+            if (internoInput) {
+              internoInput.value = found.codigoInterno || "";
+            }
+          }
+        },
+        // Atualiza automaticamente os campos de cadastro quando um código interno já existente é digitado
+        handleCodigoInternoChange(e) {
+          // Valor digitado pelo usuário no campo de código interno
+          const code = (e.target.value || "").trim();
+          if (!code) return;
+          // Procura um item existente no serviço com o mesmo código interno (ignora maiúsculas/minúsculas)
+          const found = FirestoreService.items.find((item) => {
+            return (
+              item.codigoInterno &&
+              String(item.codigoInterno).trim().toUpperCase() ===
+                code.toUpperCase()
+            );
+          });
+          if (found) {
+            // Preenche a descrição do material se existir
+            const descInput = document.getElementById("new-descricao");
+            if (descInput) {
+              descInput.value = found.descricao || "";
+            }
+            // Preenche o código do contrato (campo "Código") se existir
+            const codigoInput = document.getElementById("new-codigo");
+            if (codigoInput) {
+              codigoInput.value = found.codigo || "";
+            }
+          }
+        },
         async confirmMovement() {
           const qty =
             parseInt(document.getElementById("modal-mov-qty").value) || 0;
-          const note = (document.getElementById("modal-mov-note")?.value || "").trim();
           if (qty <= 0) return;
           const btn = document.getElementById("modal-mov-confirm");
           const originalText = btn.innerText;
@@ -6263,7 +6211,6 @@ setupMovementsListener() {
               this.state.activeModalItem.id,
               qty,
               this.state.activeModalType,
-              note,
             )
           ) {
             ToastManager.show(`Movimentação salva no Firebase!`);
@@ -6391,9 +6338,162 @@ setupMovementsListener() {
           document.getElementById("detail-est-total").innerText = total;
           document.getElementById("detail-custo-total").innerText =
             "R$ " + (custo * total).toFixed(2);
-          this.state.detailModalItemId = item.id;
-          this.setDetailsEditMode(false);
           ModalManager.open("modal-details");
+        },
+
+        /**
+         * Manipula a pesquisa de movimentações chamando a renderização das linhas.
+         * É acionado em cada alteração de filtro (texto, tipo, datas).
+         */
+        handleMovementSearch() {
+          this.renderMovementRows();
+        },
+
+        /**
+         * Renderiza as linhas da tabela de movimentações com base nos filtros de pesquisa.
+         * Filtra por termo de busca (descrição, código, código interno), tipo de movimentação,
+         * e intervalos de datas (se preenchidos). Usa o array FirestoreService.movements.
+         */
+        renderMovementRows() {
+          const tbody = document.getElementById("movements-body");
+          if (!tbody) return;
+          // Obtém valores de filtro
+          const searchTerm = (
+            document.getElementById("mov-search-term")?.value || ""
+          )
+            .trim()
+            .toLowerCase();
+          const typeFilter =
+            document.getElementById("mov-type-filter")?.value || "";
+          const dateFromVal =
+            document.getElementById("mov-date-from")?.value || "";
+          const dateToVal = document.getElementById("mov-date-to")?.value || "";
+          const fromDate = dateFromVal ? new Date(dateFromVal) : null;
+          const toDate = dateToVal ? new Date(dateToVal) : null;
+          // Filtra movimentos
+          const list = (FirestoreService.movements || []).filter((mov) => {
+            let ok = true;
+            // Termo de busca: verifica descrição, código ou interno
+            if (searchTerm) {
+              const desc = (mov.itemDescricao || mov.descricao || "")
+                .toString()
+                .toLowerCase();
+              const cod = (mov.itemCodigo || mov.codigo || "")
+                .toString()
+                .toLowerCase();
+              const interno = (mov.itemCodigoInterno || mov.codigoInterno || "")
+                .toString()
+                .toLowerCase();
+              if (
+                !(
+                  desc.includes(searchTerm) ||
+                  cod.includes(searchTerm) ||
+                  interno.includes(searchTerm)
+                )
+              )
+                ok = false;
+            }
+            // Tipo (entrada/saida)
+            if (
+              typeFilter &&
+              mov.type &&
+              mov.type.toString().toLowerCase() !== typeFilter
+            )
+              ok = false;
+            // Datas
+            if ((fromDate || toDate) && mov.createdAt) {
+              let movDate;
+              // Suporta Timestamp do Firestore (com segundos) ou string/Date
+              if (typeof mov.createdAt === "object" && mov.createdAt.seconds) {
+                movDate = new Date(mov.createdAt.seconds * 1000);
+              } else {
+                movDate = new Date(mov.createdAt);
+              }
+              if (fromDate && movDate < fromDate) ok = false;
+              if (toDate) {
+                // Ajusta toDate para final do dia
+                const toAdjusted = new Date(toDateVal + "T23:59:59");
+                if (movDate > toAdjusted) ok = false;
+              }
+            }
+            return ok;
+          });
+          // Ordena por data decrescente (mais recente primeiro)
+          list.sort((a, b) => {
+            const getTime = (m) => {
+              if (
+                m.createdAt &&
+                typeof m.createdAt === "object" &&
+                m.createdAt.seconds
+              ) {
+                return m.createdAt.seconds;
+              }
+              return new Date(m.createdAt || 0).getTime() / 1000;
+            };
+            return getTime(b) - getTime(a);
+          });
+          // Monta HTML das linhas
+          const rows = list
+            .map((mov) => {
+              // Função de escape de HTML para evitar XSS
+              const escapeHTML = (str) => {
+                return String(str || "").replace(/[&<>"']/g, (m) => {
+                  return {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;",
+                  }[m];
+                });
+              };
+              // Formata data/hora
+              let dateStr = "";
+              if (mov.createdAt) {
+                let dt;
+                if (
+                  typeof mov.createdAt === "object" &&
+                  mov.createdAt.seconds
+                ) {
+                  dt = new Date(mov.createdAt.seconds * 1000);
+                } else {
+                  dt = new Date(mov.createdAt);
+                }
+                dateStr = dt.toLocaleString("pt-BR", {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+              }
+              const qty = mov.qty || mov.quantidade || mov.qtd || 0;
+              const before = mov.before || mov.beforeStock || "";
+              const after = mov.after || mov.afterStock || "";
+              const tipo = mov.type || mov.tipo || "";
+              const desc = mov.itemDescricao || mov.descricao || "";
+              const cod = mov.itemCodigo || mov.codigo || "";
+              const interno = mov.itemCodigoInterno || mov.codigoInterno || "";
+              const user =
+                (mov.user && (mov.user.username || mov.user.name)) || "";
+              const note = mov.note || mov.observacao || "";
+              return `<tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-4 py-3 whitespace-nowrap">${dateStr}</td>
+                <td class="px-4 py-3 text-center capitalize">${tipo}</td>
+                <td class="px-4 py-3 text-center">${qty}</td>
+                <td class="px-4 py-3">${escapeHTML(desc)}</td>
+                <td class="px-4 py-3">${escapeHTML(cod)}</td>
+                <td class="px-4 py-3">${escapeHTML(interno)}</td>
+                <td class="px-4 py-3 text-center">${before}</td>
+                <td class="px-4 py-3 text-center">${after}</td>
+                <td class="px-4 py-3">${escapeHTML(user)}</td>
+                <td class="px-4 py-3">${escapeHTML(note)}</td>
+              </tr>`;
+            })
+            .join("");
+          tbody.innerHTML = rows;
+          // Atualiza ícones se houver
+          if (typeof lucide !== "undefined") lucide.createIcons();
         },
       };
 
@@ -6571,17 +6671,25 @@ setupMovementsListener() {
           const container = document.getElementById("content-area");
           const user = AuthService.getCurrentUser();
           if (!user) return;
+          // Calcula o estoque total, arredonda para 2 casas decimais e formata para pt-BR
+          const totalRawStock = FirestoreService.items.reduce(
+            (acc, curr) => acc + (Number(curr.estoque) || 0),
+            0,
+          );
+          const totalRoundedStock = Math.round(totalRawStock * 100) / 100;
+          const totalStockFormatted = totalRoundedStock.toLocaleString(
+            "pt-BR",
+            {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2,
+            },
+          );
           const stats = {
             totalItems: FirestoreService.items.length,
             lowStock: FirestoreService.items.filter(
               (i) => i.estoque <= i.estoqueMinimo,
             ).length,
-            totalStock: Math.round(
-              FirestoreService.items.reduce(
-                (acc, curr) => acc + (Number(curr.estoque) || 0),
-                0,
-              ) * 100,
-            ) / 100,
+            totalStock: totalStockFormatted,
             categories: [
               ...new Set(FirestoreService.items.map((i) => i.categoria)),
             ].length,
@@ -6668,14 +6776,7 @@ setupMovementsListener() {
             },
           };
           const c = colorMap[color];
-          const displayValue =
-            typeof value === "number" && Number.isFinite(value)
-              ? value.toLocaleString("pt-BR", {
-                  minimumFractionDigits: Number.isInteger(value) ? 0 : 0,
-                  maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
-                })
-              : value ?? "";
-          return `<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow group"><div><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">${title}</p><h3 class="text-3xl font-bold text-slate-900 group-hover:scale-105 transition-transform origin-left">${displayValue}</h3></div><div class="p-3 rounded-xl ${c.bg} ${c.text} ${c.border} border shadow-inner"><i data-lucide="${icon}" class="w-6 h-6"></i></div></div>`;
+          return `<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow group"><div><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">${title}</p><h3 class="text-3xl font-bold text-slate-900 group-hover:scale-105 transition-transform origin-left">${value}</h3></div><div class="p-3 rounded-xl ${c.bg} ${c.text} ${c.border} border shadow-inner"><i data-lucide="${icon}" class="w-6 h-6"></i></div></div>`;
         },
         renderMovementsLayout(title) {
           const container = document.getElementById("content-area");
@@ -6872,207 +6973,63 @@ setupMovementsListener() {
           reader.readAsText(file);
           event.target.value = "";
         },
-        
         renderHistoryLayout() {
           const container = document.getElementById("content-area");
-          if (!AuthService.getCurrentUser()) return;
-
-          const movements = Array.isArray(FirestoreService.movements)
-            ? FirestoreService.movements
-            : [];
-
-          const formatDate = (ts) => {
-            try {
-              if (!ts) return "-";
-              // Firestore Timestamp -> Date
-              const d =
-                typeof ts.toDate === "function"
-                  ? ts.toDate()
-                  : ts.seconds
-                    ? new Date(ts.seconds * 1000)
-                    : new Date(ts);
-              if (Number.isNaN(d.getTime())) return "-";
-              return d.toLocaleString("pt-BR");
-            } catch {
-              return "-";
-            }
-          };
-
+          if (!container) return;
+          const title = "Pesquisa de Movimentação";
           container.innerHTML = `
-            <div class="space-y-4 h-full flex flex-col animate-fade-in max-w-7xl mx-auto">
-              <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-                  <i data-lucide="history" class="w-5 h-5 text-brand-600"></i>
-                  <h2 class="text-lg font-bold text-slate-800">Pesquisa de Movimentação</h2>
+            <div class="space-y-6 h-full flex flex-col animate-fade-in max-w-[1600px] mx-auto">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm sticky top-0 z-10">
+                <div>
+                  <h2 class="text-2xl font-bold text-slate-900">${title}</h2>
+                  <p class="text-sm text-slate-500">Consultar entradas e saídas registradas no estoque</p>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                  <div class="md:col-span-4">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Material (código/descrição)</label>
-                    <input type="text" id="mov-search-text" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex.: B.01 ou tinta" />
+                <div class="flex flex-col sm:flex-row gap-3">
+                  <div class="relative group">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-500 transition-colors"></i>
+                    <input type="text" id="mov-search-term" placeholder="Buscar item, código..." oninput="InventoryController.handleMovementSearch()" class="w-full sm:w-64 pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-slate-50 focus:bg-white transition-all" />
                   </div>
-                  <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo</label>
-                    <select id="mov-type" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white">
+                  <div>
+                    <select id="mov-type-filter" onchange="InventoryController.handleMovementSearch()" class="appearance-none w-full sm:w-40 bg-white border border-slate-300 text-slate-700 py-2.5 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm cursor-pointer shadow-sm hover:border-brand-400 transition-colors">
                       <option value="">Todos</option>
-                      <option value="entrada">Entrada</option>
-                      <option value="saida">Saída</option>
+                      <option value="entrada">Entradas</option>
+                      <option value="saida">Saídas</option>
                     </select>
                   </div>
-                  <div class="md:col-span-3">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">De</label>
-                    <input type="date" id="mov-date-from" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" />
+                  <div>
+                    <input type="date" id="mov-date-from" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-32 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
                   </div>
-                  <div class="md:col-span-3">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Até</label>
-                    <input type="date" id="mov-date-to" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" />
+                    <div>
+                    <input type="date" id="mov-date-to" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-32 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
                   </div>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 mt-4">
-                  <p class="text-xs text-slate-500">
-                    Mostrando os últimos <span class="font-bold">${movements.length}</span> registros sincronizados do Firebase.
-                  </p>
-                  <button id="mov-clear" class="px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-all">
-                    Limpar filtros
-                  </button>
                 </div>
               </div>
-
-              <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-                <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <i data-lucide="list" class="w-4 h-4 text-slate-400"></i>
-                    <span class="text-sm font-bold text-slate-700">Histórico</span>
-                  </div>
-                  <span id="mov-count" class="text-xs text-slate-500"></span>
-                </div>
-
-                <div class="overflow-auto custom-scrollbar flex-1">
-                  <table class="w-full text-sm">
-                    <thead class="sticky top-0 bg-slate-50 text-slate-500 text-xs uppercase">
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
+                <div class="overflow-auto flex-1 custom-scrollbar">
+                  <table class="w-full text-sm text-left relative">
+                    <thead class="bg-slate-50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider sticky top-0 z-10 backdrop-blur-sm border-b border-slate-200">
                       <tr>
-                        <th class="text-left px-4 py-3 font-bold">Data/Hora</th>
-                        <th class="text-left px-4 py-3 font-bold">Tipo</th>
-                        <th class="text-left px-4 py-3 font-bold">Material</th>
-                        <th class="text-right px-4 py-3 font-bold">Qtd</th>
-                        <th class="text-right px-4 py-3 font-bold">Antes</th>
-                        <th class="text-right px-4 py-3 font-bold">Depois</th>
-                        <th class="text-left px-4 py-3 font-bold">Usuário</th>
-                        <th class="text-left px-4 py-3 font-bold">Obs</th>
+                        <th class="px-4 py-4">Data/Hora</th>
+                        <th class="px-4 py-4 text-center">Tipo</th>
+                        <th class="px-4 py-4 text-center">Qtd</th>
+                        <th class="px-4 py-4">Descrição</th>
+                        <th class="px-4 py-4">Contrato</th>
+                        <th class="px-4 py-4">Cód. Int.</th>
+                        <th class="px-4 py-4 text-center">Antes</th>
+                        <th class="px-4 py-4 text-center">Depois</th>
+                        <th class="px-4 py-4">Usuário</th>
+                        <th class="px-4 py-4">Obs.</th>
                       </tr>
                     </thead>
-                    <tbody id="mov-tbody" class="divide-y divide-slate-100"></tbody>
+                    <tbody id="movements-body" class="divide-y divide-slate-100"></tbody>
                   </table>
                 </div>
               </div>
             </div>
           `;
-
-          const applyFilters = () => {
-            const qText = (document.getElementById("mov-search-text").value || "")
-              .toLowerCase()
-              .trim();
-            const qType = document.getElementById("mov-type").value || "";
-            const dFrom = document.getElementById("mov-date-from").value;
-            const dTo = document.getElementById("mov-date-to").value;
-
-            const fromDate = dFrom ? new Date(dFrom + "T00:00:00") : null;
-            const toDate = dTo ? new Date(dTo + "T23:59:59") : null;
-
-            const filtered = movements.filter((m) => {
-              if (qType && (m.type || "") !== qType) return false;
-
-              if (qText) {
-                const hay = `${m.itemCodigo || ""} ${m.itemDescricao || ""} ${m.itemCategoria || ""}`
-                  .toLowerCase()
-                  .trim();
-                if (!hay.includes(qText)) return false;
-              }
-
-              if (fromDate || toDate) {
-                const ts = m.createdAt;
-                const dt =
-                  ts && typeof ts.toDate === "function"
-                    ? ts.toDate()
-                    : ts && ts.seconds
-                      ? new Date(ts.seconds * 1000)
-                      : ts
-                        ? new Date(ts)
-                        : null;
-                if (!dt || Number.isNaN(dt.getTime())) return false;
-                if (fromDate && dt < fromDate) return false;
-                if (toDate && dt > toDate) return false;
-              }
-
-              return true;
-            });
-
-            const tbody = document.getElementById("mov-tbody");
-            const countEl = document.getElementById("mov-count");
-            countEl.textContent = `${filtered.length} registro(s)`;
-
-            if (!filtered.length) {
-              tbody.innerHTML = `
-                <tr>
-                  <td colspan="8" class="px-4 py-10 text-center text-slate-400">
-                    Nenhum movimento encontrado com os filtros atuais.
-                  </td>
-                </tr>
-              `;
-              return;
-            }
-
-            tbody.innerHTML = filtered
-              .map((m) => {
-                const typeLabel =
-                  (m.type || "") === "entrada"
-                    ? `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200"><i data-lucide="arrow-down-circle" class="w-3 h-3"></i>Entrada</span>`
-                    : `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200"><i data-lucide="arrow-up-circle" class="w-3 h-3"></i>Saída</span>`;
-
-                const user =
-                  m.user && (m.user.label || m.user.name || m.user.username)
-                    ? (m.user.label || m.user.name || m.user.username)
-                    : "-";
-
-                return `
-                  <tr class="hover:bg-slate-50">
-                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">${formatDate(m.createdAt)}</td>
-                    <td class="px-4 py-3">${typeLabel}</td>
-                    <td class="px-4 py-3">
-                      <div class="font-bold text-slate-800">${m.itemCodigo || "-"}</div>
-                      <div class="text-xs text-slate-500">${m.itemDescricao || "-"}</div>
-                    </td>
-                    <td class="px-4 py-3 text-right font-bold text-slate-800">${Number(m.qty || 0)}</td>
-                    <td class="px-4 py-3 text-right text-slate-600">${Number(m.before || 0)}</td>
-                    <td class="px-4 py-3 text-right text-slate-600">${Number(m.after || 0)}</td>
-                    <td class="px-4 py-3 text-slate-600">${user}</td>
-                    <td class="px-4 py-3 text-slate-500 text-xs">${m.note || "-"}</td>
-                  </tr>
-                `;
-              })
-              .join("");
-
-            lucide.createIcons();
-          };
-
-          document.getElementById("mov-search-text").addEventListener("input", applyFilters);
-          document.getElementById("mov-type").addEventListener("change", applyFilters);
-          document.getElementById("mov-date-from").addEventListener("change", applyFilters);
-          document.getElementById("mov-date-to").addEventListener("change", applyFilters);
-
-          document.getElementById("mov-clear").addEventListener("click", () => {
-            document.getElementById("mov-search-text").value = "";
-            document.getElementById("mov-type").value = "";
-            document.getElementById("mov-date-from").value = "";
-            document.getElementById("mov-date-to").value = "";
-            applyFilters();
-          });
-
-          applyFilters();
+          InventoryController.renderMovementRows();
           lucide.createIcons();
         },
-
         renderRegisterLayout() {
           const container = document.getElementById("content-area");
           container.innerHTML = `
@@ -7080,10 +7037,10 @@ setupMovementsListener() {
               <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                 <div class="mb-8"><h2 class="text-2xl font-bold text-slate-900">Cadastro de Material</h2><p class="text-sm text-slate-500">Adicione um novo item ao estoque manualmente.</p></div>
                 <form onsubmit="InventoryController.saveNewItem(event)" class="space-y-5">
-                  <div class="grid grid-cols-2 gap-5"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Código</label><input type="text" id="new-codigo" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: B.01.01.001" required /></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cód. Interno</label><input type="text" id="new-codigo-interno" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Opcional" /></div></div>
+                  <div class="grid grid-cols-2 gap-5"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Código</label><input type="text" id="new-codigo" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: B.01.01.001" required /></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cód. Interno</label><input type="text" id="new-codigo-interno" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Obrigatório" required /></div></div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Descrição do Material</label><input type="text" id="new-descricao" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Nome completo do item" required /></div>
                   <div class="grid grid-cols-2 gap-5">
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Categoria</label><select id="new-categoria" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white"><option value="DEPÓSITO GERAL">DEPÓSITO GERAL</option><option value="DEPÓSITO C4 - GÁS">DEPÓSITO C4 - GÁS</option><option value="DEPÓSITO 01 - IMPERMEABILIZAÇÃO">DEPÓSITO 01 - IMPERMEABILIZAÇÃO</option><option value="DEPÓSITO 02 - TINTA ESMALTE">DEPÓSITO 02 - TINTA ESMALTE</option><option value="DEPÓSITO 25 - TINTA ACRÍLICA">DEPÓSITO 25 - TINTA ACRÍLICA</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Categoria</label><select id="new-categoria" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white"></select></div>
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Unidade</label><input type="text" id="new-unidade" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: Unidade" required /></div>
                   </div>
                   <div class="grid grid-cols-3 gap-5 border-t border-slate-100 pt-5">
@@ -7095,6 +7052,45 @@ setupMovementsListener() {
                 </form>
               </div>
             </div>`;
+          // Popula a lista de categorias com todos os depósitos cadastrados no banco
+          (function populateCategories() {
+            const selectCat = document.getElementById("new-categoria");
+            if (selectCat) {
+              // Obtém categorias únicas a partir dos itens carregados
+              const uniqueCats = Array.from(
+                new Set(
+                  (FirestoreService.items || [])
+                    .map((item) => item.categoria)
+                    .filter((c) => c && typeof c === "string"),
+                ),
+              );
+              // Remove a categoria "DEPÓSITO GERAL" se presente
+              const filtered = uniqueCats.filter(
+                (c) => c.trim().toUpperCase() !== "DEPÓSITO GERAL",
+              );
+              // Ordena alfabeticamente
+              filtered.sort((a, b) => a.localeCompare(b));
+              // Monta HTML de opções
+              selectCat.innerHTML = filtered
+                .map((cat) => `<option value="${cat}">${cat}</option>`)
+                .join("");
+            }
+          })();
+          // Adiciona listener para atualizar descrição ao digitar o código interno
+          const codigoInternoInput =
+            document.getElementById("new-codigo-interno");
+          if (codigoInternoInput) {
+            codigoInternoInput.addEventListener("change", (e) => {
+              InventoryController.handleCodigoInternoChange(e);
+            });
+          }
+          // Adiciona listener para atualizar descrição e código interno ao digitar o código de contrato
+          const codigoInput = document.getElementById("new-codigo");
+          if (codigoInput) {
+            codigoInput.addEventListener("change", (e) => {
+              InventoryController.handleCodigoChange(e);
+            });
+          }
           lucide.createIcons();
         },
       };
