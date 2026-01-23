@@ -263,6 +263,16 @@
             ></i>
           </button>
         </form>
+        <!-- Link para redefinir senha -->
+        <div class="text-center mt-3">
+          <button
+            type="button"
+            onclick="ModalManager.open('modal-reset')"
+            class="text-xs text-brand-600 hover:underline focus:outline-none"
+          >
+            Esqueceu sua senha?
+          </button>
+        </div>
         <p class="text-center text-xs text-slate-400 mt-8 font-medium">
           Versão 5.6 Fixed Sort
         </p>
@@ -878,6 +888,74 @@
       </div>
     </div>
 
+    <!-- Modal Redefinir Senha -->
+    <div
+      id="modal-reset"
+      class="fixed inset-0 bg-slate-900/60 z-50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0 pointer-events-none"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform scale-95 transition-all duration-300"
+      >
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 tracking-tight">
+              Redefinir Senha
+            </h3>
+          </div>
+          <button
+            onclick="ModalManager.close('modal-reset')"
+            class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded-full transition-colors"
+          >
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        <form onsubmit="AuthController.handleResetPassword(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+              >Usuário</label
+            >
+            <input
+              type="text"
+              id="reset-username"
+              required
+              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              placeholder="Digite seu usuário"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+              >Nova Senha</label
+            >
+            <input
+              type="password"
+              id="reset-new"
+              required
+              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              placeholder="Digite a nova senha"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+              >Confirmar Senha</label
+            >
+            <input
+              type="password"
+              id="reset-confirm"
+              required
+              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              placeholder="Confirme a nova senha"
+            />
+          </div>
+          <button
+            type="submit"
+            class="w-full px-4 py-3 rounded-lg bg-brand-600 text-white font-bold shadow-lg hover:bg-brand-700 transition-all transform active:scale-95"
+          >
+            Redefinir Senha
+          </button>
+        </form>
+      </div>
+    </div>
+
     <!-- ================== SCRIPT ENGINE ================== -->
     <script type="module">
       'use strict';
@@ -891,6 +969,11 @@
         updateDoc,
         writeBatch,
         onSnapshot,
+        runTransaction,
+        query,
+        orderBy,
+        limit,
+        serverTimestamp,
       } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       import {
         getAuth,
@@ -5920,19 +6003,42 @@
           if (hasUpdates) batch.commit();
         },
 
-        async updateStock(id, qty, type) {
-          const itemIndex = this.items.findIndex((i) => i.id === id);
-          if (itemIndex === -1) return false;
-          const item = this.items[itemIndex];
-          let newStock = item.estoque;
-          if (type === "entrada") newStock += qty;
-          else newStock = Math.max(0, newStock - qty);
+        async updateStock(id, qty, type, note = null) {
+          // Atualiza o estoque e registra a movimentação em uma transação atômica
           try {
+            const user = AuthService.getCurrentUser();
             const itemRef = doc(db, "items", String(id));
-            await updateDoc(itemRef, { estoque: newStock });
+            const movRef = doc(collection(db, "movements"));
+            await runTransaction(db, async (tx) => {
+              const snap = await tx.get(itemRef);
+              if (!snap.exists()) throw new Error("Item não encontrado");
+              const data = snap.data() || {};
+              const before = Number(data.estoque) || 0;
+              const after = type === "entrada" ? before + qty : Math.max(0, before - qty);
+              tx.update(itemRef, { estoque: after });
+              tx.set(movRef, {
+                itemId: String(id),
+                type,
+                qty,
+                before,
+                after,
+                createdAt: serverTimestamp(),
+                user: user
+                  ? {
+                      username: user.username || null,
+                      name: user.name || null,
+                      label: user.label || null,
+                    }
+                  : null,
+                itemCodigo: data.codigo || null,
+                itemDescricao: data.descricao || null,
+                itemCodigoInterno: data.codigoInterno || null,
+                note: note || null,
+              });
+            });
             return true;
           } catch (e) {
-            console.error("Erro ao salvar no Firebase:", e);
+            console.error("Erro ao salvar movimentação:", e);
             return false;
           }
         },
@@ -6001,14 +6107,30 @@
         state: { currentUser: null },
         async login(username, password) {
           const users = FirestoreService.users;
-          const targetUser = users.find(
-            (u) => u.username === username.toLowerCase().trim(),
-          );
+          // Remove acentos e normaliza a entrada do usuário
+          const normalize = (str) =>
+            (str || "")
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+          const searchKey = normalize(username.trim());
+          // Procura por coincidência exata no username ou no primeiro nome normalizado
+          const targetUser = users.find((u) => {
+            const normalizedUsername = normalize(u.username);
+            const normalizedFirstName = normalize((u.name || "").split(" ")[0]);
+            return (
+              normalizedUsername === searchKey ||
+              normalizedFirstName === searchKey
+            );
+          });
           if (!targetUser) return false;
           const inputHash = await SecurityUtils.hash(password);
           if (targetUser.passwordHash === inputHash) {
             this.state.currentUser = targetUser;
-            localStorage.setItem("serob_session", JSON.stringify(targetUser));
+            localStorage.setItem(
+              "serob_session",
+              JSON.stringify(targetUser),
+            );
             return true;
           }
           return false;
@@ -6082,6 +6204,8 @@
             modal
               .querySelector('div[id$="-content"]')
               ?.classList.add("scale-100");
+            // Atualiza ícones do lucide ao abrir modais
+            if (typeof lucide !== "undefined") lucide.createIcons();
           });
         },
         close(id) {
@@ -6200,6 +6324,117 @@
           }
           btn.innerHTML = originalText;
           btn.disabled = false;
+        },
+
+        /**
+         * Processa o pedido de redefinição de senha no modal de login.
+         * Solicita o nome de usuário, nova senha e confirmação.
+         * Atualiza a senha no Firestore se o usuário existir.
+         */
+        async handleResetPassword(e) {
+          e.preventDefault();
+          const usernameInput = document.getElementById("reset-username");
+          const newPwdInput = document.getElementById("reset-new");
+          const confirmInput = document.getElementById("reset-confirm");
+          const username = usernameInput.value.trim().toLowerCase();
+          const newPwd = newPwdInput.value;
+          const confirm = confirmInput.value;
+          // Validações básicas
+          if (!username) {
+            ToastManager.show("Informe o usuário.", "error");
+            return;
+          }
+          if (newPwd.length < 3) {
+            ToastManager.show("Nova senha muito curta.", "error");
+            return;
+          }
+          if (newPwd !== confirm) {
+            ToastManager.show("Confirmação não coincide.", "error");
+            return;
+          }
+          const btn = e.target.querySelector('button[type="submit"]');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = "Salvando...";
+          btn.disabled = true;
+          try {
+            // Garante que a lista de usuários esteja carregada antes de prosseguir
+            try {
+              await FirestoreService.syncUsers();
+            } catch (syncErrPre) {
+              console.warn(
+                "Não foi possível sincronizar usuários antes da redefinição:",
+                syncErrPre,
+              );
+            }
+            const newHash = await SecurityUtils.hash(newPwd);
+            // Atualiza lista local de usuários e localStorage
+            // Normaliza strings removendo acentos para comparar tanto com o
+            // username quanto com o primeiro nome do usuário. Isso permite que
+            // o campo aceite entradas como "Antônio" ou "Jessé" e localize
+            // corretamente os usuários "antonio" e "jesse".
+            const normalize = (str) =>
+              (str || "")
+                .toLowerCase()
+                .normalize("NFD")
+                // Remove diacríticos (acentos) utilizando faixa unicode genérica
+                .replace(/[\u0300-\u036f]/g, "");
+            const searchKey = normalize(username);
+            const userIndex = FirestoreService.users.findIndex((u) => {
+              const normalizedUsername = normalize(u.username);
+              const normalizedFirstName = normalize(
+                (u.name || "").split(" ")[0],
+              );
+              return (
+                normalizedUsername === searchKey ||
+                normalizedFirstName === searchKey
+              );
+            });
+            if (userIndex < 0) {
+              ToastManager.show(
+                "Usuário não encontrado para redefinir senha.",
+                "error",
+              );
+              return;
+            }
+            // Atualiza senha em memória
+            FirestoreService.users[userIndex].passwordHash = newHash;
+            // Persiste em localStorage caso o cache seja utilizado
+            try {
+              localStorage.setItem(
+                "serob_db_users",
+                JSON.stringify(FirestoreService.users),
+              );
+            } catch (lsErr) {
+              console.error("Não foi possível salvar no localStorage:", lsErr);
+            }
+            // Tenta atualizar no Firestore (não bloqueante). Usa o username real do
+            // usuário encontrado para que o documento seja atualizado mesmo que o
+            // valor digitado contenha acentos ou abreviações.
+            try {
+              const targetUsername = FirestoreService.users[userIndex].username;
+              await FirestoreService.updateUserPassword(targetUsername, newHash);
+            } catch (remoteErr) {
+              console.warn("Falha ao atualizar senha no Firestore:", remoteErr);
+            }
+            // Pronto, concluído
+            // Notifica o usuário e fecha o modal. Não recarregamos a página
+            // para que o novo hash permaneça em memória (FirestoreService.users)
+            // e o login funcione imediatamente com a nova senha.
+            ToastManager.show(
+              "Senha redefinida com sucesso! Use sua nova senha para fazer login.",
+            );
+            ModalManager.close("modal-reset");
+            e.target.reset();
+          } catch (err) {
+            console.error(err);
+            ToastManager.show(
+              "Erro inesperado ao redefinir senha.",
+              "error",
+            );
+          } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }
         },
       };
 
@@ -6585,7 +6820,18 @@
               const desc = mov.itemDescricao || mov.descricao || "";
               const cod = mov.itemCodigo || mov.codigo || "";
               const interno = mov.itemCodigoInterno || mov.codigoInterno || "";
-              const user = (mov.user && (mov.user.username || mov.user.name)) || "";
+              // Exibe o nome do usuário: se houver "name", usa apenas o primeiro nome; senão, capitaliza o username
+              let user = "";
+              if (mov.user) {
+                if (mov.user.name) {
+                  // Usa somente o primeiro nome antes do primeiro espaço
+                  const parts = mov.user.name.trim().split(/\s+/);
+                  user = parts.length > 0 ? parts[0] : mov.user.name;
+                } else if (mov.user.username) {
+                  const u = String(mov.user.username);
+                  user = u.charAt(0).toUpperCase() + u.slice(1);
+                }
+              }
               const note = mov.note || mov.observacao || "";
               return `<tr class="hover:bg-slate-50 transition-colors">
                 <td class="px-4 py-3 whitespace-nowrap">${dateStr}</td>
