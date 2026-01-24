@@ -263,16 +263,6 @@
             ></i>
           </button>
         </form>
-        <!-- Link para redefinir senha -->
-        <div class="text-center mt-3">
-          <button
-            type="button"
-            onclick="ModalManager.open('modal-reset')"
-            class="text-xs text-brand-600 hover:underline focus:outline-none"
-          >
-            Esqueceu sua senha?
-          </button>
-        </div>
         <p class="text-center text-xs text-slate-400 mt-8 font-medium">
           Versão 5.6 Fixed Sort
         </p>
@@ -444,6 +434,12 @@
                   </button>
                   <div class="border-t border-slate-50 my-1"></div>
                 </div>
+                <button
+                  onclick="App.openProfileSetupModal()"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <i data-lucide="user-cog" class="w-3.5 h-3.5"></i> Configurar Usuário
+                </button>
                 <button
                   onclick="App.openPasswordModal()"
                   class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
@@ -820,162 +816,101 @@
       </div>
     </div>
 
-    <!-- Modal Alterar Senha -->
+    <!-- Modal Configurar Usuário (perfil/role no Firestore) -->
     <div
-      id="modal-password"
+      id="modal-profile-setup"
       class="fixed inset-0 bg-slate-900/60 z-50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0 pointer-events-none"
     >
       <div
-        class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform scale-95 transition-all duration-300"
+        class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 transform scale-95 transition-all duration-300"
+        id="modal-profile-setup-content"
       >
-        <div class="flex justify-between items-start mb-6">
+        <div class="flex justify-between items-start mb-4">
           <div>
             <h3 class="text-xl font-bold text-slate-900 tracking-tight">
-              Alterar Senha
+              Configurar Usuário
             </h3>
+            <p class="text-sm font-medium text-slate-500 mt-1">
+              Escolha quem está usando este dispositivo agora.
+            </p>
           </div>
           <button
-            onclick="ModalManager.close('modal-password')"
-            class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded-full transition-colors"
+            onclick="ModalManager.close('modal-profile-setup')"
+            class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors"
+            title="Fechar"
           >
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
-        <form onsubmit="App.changePassword(event)" class="space-y-4">
-          <div>
-            <label
-              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
-              >Senha Atual</label
-            >
-            <input
-              type="password"
-              id="pwd-current"
-              required
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-              placeholder="Digite a senha atual"
-            />
-          </div>
-          <div>
-            <label
-              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
-              >Nova Senha</label
-            >
-            <input
-              type="password"
-              id="pwd-new"
-              required
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-              placeholder="Digite a nova senha"
-            />
-          </div>
-          <div>
-            <label
-              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
-              >Confirmar Senha</label
-            >
-            <input
-              type="password"
-              id="pwd-confirm"
-              required
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-              placeholder="Confirme a nova senha"
-            />
-          </div>
-          <button
-            type="submit"
-            class="w-full px-4 py-3 rounded-lg bg-brand-600 text-white font-bold shadow-lg hover:bg-brand-700 transition-all transform active:scale-95"
-          >
-            Salvar Senha
-          </button>
-        </form>
-      </div>
-    </div>
 
-    <!-- Modal Redefinir Senha -->
-    <div
-      id="modal-reset"
-      class="fixed inset-0 bg-slate-900/60 z-50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0 pointer-events-none"
-    >
-      <div
-        class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform scale-95 transition-all duration-300"
-      >
-        <div class="flex justify-between items-start mb-6">
-          <div>
-            <h3 class="text-xl font-bold text-slate-900 tracking-tight">
-              Redefinir Senha
-            </h3>
-          </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5">
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Isso define o <span class="font-semibold">nome</span> e a
+            <span class="font-semibold">permissão</span> (Admin/Usuário)
+            em <span class="font-mono">users/{uid}</span>. Você pode trocar
+            depois.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3">
           <button
-            onclick="ModalManager.close('modal-reset')"
-            class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded-full transition-colors"
+            onclick="App.applyProfilePreset('jefferson_admin')"
+            class="w-full flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-brand-200 bg-brand-50 hover:bg-brand-100 transition-colors"
           >
-            <i data-lucide="x" class="w-6 h-6"></i>
+            <div class="text-left">
+              <p class="text-sm font-bold text-brand-900">Jefferson</p>
+              <p class="text-xs font-semibold text-brand-700">Administrador</p>
+            </div>
+            <i data-lucide="shield" class="w-5 h-5 text-brand-700"></i>
+          </button>
+
+          <button
+            onclick="App.applyProfilePreset('jesse_user')"
+            class="w-full flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+          >
+            <div class="text-left">
+              <p class="text-sm font-bold text-slate-900">Jessé</p>
+              <p class="text-xs font-semibold text-slate-600">Usuário</p>
+            </div>
+            <i data-lucide="user" class="w-5 h-5 text-slate-500"></i>
+          </button>
+
+          <button
+            onclick="App.applyProfilePreset('antonio_user')"
+            class="w-full flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+          >
+            <div class="text-left">
+              <p class="text-sm font-bold text-slate-900">Antônio</p>
+              <p class="text-xs font-semibold text-slate-600">Usuário</p>
+            </div>
+            <i data-lucide="user" class="w-5 h-5 text-slate-500"></i>
           </button>
         </div>
-        <form
-          onsubmit="AuthController.handleResetPassword(event)"
-          class="space-y-4"
-        >
-          <div>
-            <label
-              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
-              >Usuário</label
-            >
-            <input
-              type="text"
-              id="reset-username"
-              required
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-              placeholder="Digite seu usuário"
-            />
-          </div>
-          <div>
-            <label
-              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
-              >Nova Senha</label
-            >
-            <input
-              type="password"
-              id="reset-new"
-              required
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-              placeholder="Digite a nova senha"
-            />
-          </div>
-          <div>
-            <label
-              class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
-              >Confirmar Senha</label
-            >
-            <input
-              type="password"
-              id="reset-confirm"
-              required
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-              placeholder="Confirme a nova senha"
-            />
-          </div>
+
+        <div class="flex items-center justify-between mt-6">
           <button
-            type="submit"
-            class="w-full px-4 py-3 rounded-lg bg-brand-600 text-white font-bold shadow-lg hover:bg-brand-700 transition-all transform active:scale-95"
+            onclick="App.keepGuestProfile()"
+            class="text-sm font-semibold text-slate-600 hover:text-slate-900"
           >
-            Redefinir Senha
+            Continuar como Convidado
           </button>
-        </form>
+          <p class="text-xs text-slate-400">Configuração salva neste dispositivo</p>
+        </div>
       </div>
     </div>
 
     <!-- ================== SCRIPT ENGINE ================== -->
     <script type="module">
-      "use strict";
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import {
         getFirestore,
         collection,
+        getDoc,
         getDocs,
         setDoc,
         doc,
         updateDoc,
+        deleteDoc,
         writeBatch,
         onSnapshot,
         runTransaction,
@@ -987,6 +922,7 @@
       import {
         getAuth,
         signInAnonymously,
+        signOut,
       } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
       // --- Configuração ---
@@ -1003,32 +939,10 @@
       const db = getFirestore(app);
       const auth = getAuth(app);
 
-      // --- Dados Semente (Fallback e Migração) ---
-      const DEFAULT_PASSWORD_HASH =
-        "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
-      const SEED_USERS = [
-        {
-          name: "Jefferson de Araújo Silva",
-          username: "jefferson",
-          role: "admin",
-          label: "Administrador",
-          passwordHash: DEFAULT_PASSWORD_HASH,
-        },
-        {
-          name: "Antônio Pinto Melo Sousa Júnior",
-          username: "antonio",
-          role: "user",
-          label: "Usuário",
-          passwordHash: DEFAULT_PASSWORD_HASH,
-        },
-        {
-          name: "Jessé Souza dos Anjos",
-          username: "jesse",
-          role: "user",
-          label: "Usuário",
-          passwordHash: DEFAULT_PASSWORD_HASH,
-        },
-      ];
+      // --- Segurança ---
+      // Não deixamos seed/listas de usuários/senhas/config sensível no HTML.
+      // O acesso ao Firestore usa Firebase Auth (anônimo) e o perfil do usuário
+      // fica em users/{uid} (criado automaticamente como "Convidado").
 
       const SEED_ITEMS = [
         // DEPÓSITO C4 - GÁS
@@ -5859,143 +5773,173 @@
 
       // --- Serviços (Firestore) ---
       const FirestoreService = {
+        // Perfil do usuário autenticado (Firebase Auth)
+        profile: null,
+        // Mantido por compatibilidade com partes antigas do app (não usamos mais login local)
         users: [],
         items: [],
-        // Movimentos registrados (entradas/saídas)
-        movements: [],
 
         async init() {
           try {
-            await signInAnonymously(auth);
-            console.log("Conectado ao Firebase.");
-            await this.syncUsers();
+            // ==============================
+            // Login anônimo automático
+            // ==============================
+            // Não deixa o app travar eternamente na tela "Conectando...".
+            const bootTimeout = new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("BOOT_TIMEOUT")),
+                6500,
+              ),
+            );
+
+            const cred = await Promise.race([signInAnonymously(auth), bootTimeout]);
+            const fbUser = cred?.user || auth.currentUser;
+
+            // Cria automaticamente users/{uid} como perfil convidado
+            await this.ensureGuestProfile(fbUser);
+
             await new Promise((resolve) => {
               this.setupRealtimeListener(resolve);
             });
-            // Inicia listener de movimentações
-            this.setupMovementsListener();
           } catch (e) {
             console.error("Erro ao conectar Firebase:", e);
-            ToastManager.show(
-              "Erro ao conectar ao banco de dados. Verifique sua conexão.",
-              "error",
-            );
-          }
-        },
 
-        async syncUsers() {
-          const usersRef = collection(db, "users");
-          const usersSnap = await getDocs(usersRef);
-
-          // Carrega cache local (quando existir) para manter alterações no dispositivo
-          // mesmo se as regras do Firestore impedirem update remoto.
-          let localUsers = null;
-          try {
-            localUsers = JSON.parse(
-              localStorage.getItem("serob_db_users") || "null",
-            );
-          } catch (_) {
-            localUsers = null;
-          }
-
-          if (usersSnap.empty) {
-            const usersToUpload = localUsers || SEED_USERS;
-            const batch = writeBatch(db);
-
-            for (const user of usersToUpload) {
-              if (user.password && !user.passwordHash) {
-                user.passwordHash = await SecurityUtils.hash(user.password);
-                delete user.password;
-              }
-              const docRef = doc(db, "users", user.username);
-              batch.set(docRef, user);
+            // UI amigável (não trava no loading)
+            const loadingText = document.getElementById("loading-text");
+            if (loadingText) {
+              loadingText.textContent =
+                "Não foi possível conectar ao Firebase. Verifique domínios autorizados, regras e conexão.";
             }
-
-            await batch.commit();
-            this.users = usersToUpload;
-
-            // Atualiza o cache local
             try {
-              localStorage.setItem(
-                "serob_db_users",
-                JSON.stringify(this.users),
+              ToastManager?.show?.(
+                "Falha ao conectar ao Firebase. Verifique configuração e conexão.",
+                "error",
               );
-            } catch (_) {}
-            return;
+            } catch {}
+            // Mostra a tela de login (fallback visual)
+            const loginLayout = document.getElementById("login-layout");
+            if (loginLayout) loginLayout.classList.remove("hidden");
           }
+        },
 
-          // Firestore possui dados: usa como base
-          const remoteUsers = usersSnap.docs.map((d) => d.data());
+        async ensureGuestProfile(fbUser) {
+          const user = fbUser || auth.currentUser;
+          if (!user) throw new Error("NO_AUTH_USER");
 
-          // Mescla cache local por username (prioriza local para passwordHash)
-          if (Array.isArray(localUsers) && localUsers.length) {
-            const byUsername = new Map(remoteUsers.map((u) => [u.username, u]));
-            for (const lu of localUsers) {
-              if (!lu || !lu.username) continue;
-              const ru = byUsername.get(lu.username);
-              if (!ru) continue;
+          const uid = user.uid;
+          const ref = doc(db, "users", uid);
 
-              // Se o cache local tem passwordHash diferente, assume que é a versão válida do dispositivo
-              if (lu.passwordHash && lu.passwordHash !== ru.passwordHash) {
-                ru.passwordHash = lu.passwordHash;
+          // Perfil mínimo imediato (evita UI vazia enquanto o snapshot não chega)
+          this.profile = this.profile || {
+            uid,
+            name: "Convidado",
+            label: "Convidado",
+            role: "user",
+            active: true,
+          };
 
-                // Tenta reconciliar no Firestore (best-effort; não bloqueia)
-                try {
-                  await updateDoc(doc(db, "users", lu.username), {
-                    passwordHash: lu.passwordHash,
-                  });
-                } catch (e) {
-                  console.warn(
-                    "Sem permissão para atualizar passwordHash no Firestore (mantendo no cache local).",
-                    e,
-                  );
-                }
-              }
-
-              // Mescla outros campos úteis (sem sobrescrever remoto com undefined)
-              const mergeFields = ["name", "role"];
-              for (const f of mergeFields) {
-                if (typeof lu[f] !== "undefined" && lu[f] !== null)
-                  ru[f] = lu[f];
-              }
+          // Se não existir, cria como convidado
+          const snap = await getDoc(ref);
+          if (!snap.exists()) {
+            await setDoc(
+              ref,
+              {
+                uid,
+                name: "Convidado",
+                label: "Convidado",
+                role: "user",
+                active: true,
+                isAnonymous: true,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+          } else {
+            // Garante campos mínimos
+            const data = snap.data() || {};
+            const patch = {};
+            if (!data.uid) patch.uid = uid;
+            if (!data.name) patch.name = "Convidado";
+            if (!data.label) patch.label = data.role === "admin" ? "Administrador" : "Usuário";
+            if (!data.role) patch.role = "user";
+            if (Object.keys(patch).length) {
+              patch.updatedAt = serverTimestamp();
+              await setDoc(ref, patch, { merge: true });
             }
           }
 
-          this.users = remoteUsers;
-
-          // Regrava cache local com a versão em memória
-          try {
-            localStorage.setItem("serob_db_users", JSON.stringify(this.users));
-          } catch (_) {}
+          // Mantém o perfil em tempo real
+          onSnapshot(
+            ref,
+            (d) => {
+              const data = d.exists() ? d.data() : null;
+              this.profile = data || {
+                uid,
+                name: "Convidado",
+                label: "Convidado",
+                role: "user",
+                active: true,
+              };
+              if (window.App && typeof window.App.updateUserProfile === "function") {
+                window.App.updateUserProfile();
+              }
+            },
+            (err) => {
+              console.warn("Listener users/{uid} falhou:", err);
+              this.profile = this.profile || {
+                uid,
+                name: "Convidado",
+                label: "Convidado",
+                role: "user",
+                active: true,
+              };
+            },
+          );
         },
 
-        /**
-         * Inicializa o listener em tempo real para a coleção de movimentações.
-         * Armazena os documentos no array FirestoreService.movements e, se
-         * a aba atual for de pesquisa de movimentação, renderiza novamente a lista.
-         */
-        setupMovementsListener() {
-          try {
-            const movRef = collection(db, "movements");
-            // Ordena por data decrescente, limitado a um número razoável de registros
-            const q = query(movRef, orderBy("createdAt", "desc"), limit(500));
-            onSnapshot(q, (snapshot) => {
-              this.movements = snapshot.docs.map((d) => {
-                const data = d.data() || {};
-                return { id: d.id, ...data };
-              });
-              // Se estivermos na aba de pesquisa de movimentação, atualiza a UI
-              if (
-                window.InventoryController &&
-                window.App &&
-                App.currentTab === "movement-search"
-              ) {
-                InventoryController.renderMovementRows();
-              }
-            });
-          } catch (e) {
-            console.error("Erro ao iniciar listener de movimentações:", e);
-          }
+        // Define nome e permissão do usuário atual em users/{uid}.
+        // (Como o login é anônimo, este preset é uma convenção operacional.)
+        async applyProfilePreset(presetKey) {
+          const fbUser = auth.currentUser;
+          if (!fbUser) throw new Error("NO_AUTH_USER");
+
+          const presets = {
+            jefferson_admin: {
+              name: "Jefferson",
+              role: "admin",
+              label: "Administrador",
+            },
+            jesse_user: {
+              name: "Jessé",
+              role: "user",
+              label: "Usuário",
+            },
+            antonio_user: {
+              name: "Antônio",
+              role: "user",
+              label: "Usuário",
+            },
+          };
+
+          const preset = presets[presetKey];
+          if (!preset) throw new Error("INVALID_PRESET");
+
+          const uid = fbUser.uid;
+          const ref = doc(db, "users", uid);
+          await setDoc(
+            ref,
+            {
+              uid,
+              name: preset.name,
+              role: preset.role,
+              label: preset.label,
+              active: true,
+              isAnonymous: !!fbUser.isAnonymous,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
         },
 
         setupRealtimeListener(onFirstLoad) {
@@ -6080,73 +6024,36 @@
           if (hasUpdates) batch.commit();
         },
 
-        async updateStock(id, qty, type, note = null) {
-          // Atualiza o estoque e registra a movimentação em uma transação atômica
+        async updateStock(id, qty, type) {
+          const itemIndex = this.items.findIndex((i) => i.id === id);
+          if (itemIndex === -1) return false;
+          const item = this.items[itemIndex];
+          let newStock = item.estoque;
+          if (type === "entrada") newStock += qty;
+          else newStock = Math.max(0, newStock - qty);
           try {
-            const user = AuthService.getCurrentUser();
             const itemRef = doc(db, "items", String(id));
-            const movRef = doc(collection(db, "movements"));
-            await runTransaction(db, async (tx) => {
-              const snap = await tx.get(itemRef);
-              if (!snap.exists()) throw new Error("Item não encontrado");
-              const data = snap.data() || {};
-              const before = Number(data.estoque) || 0;
-              const after =
-                type === "entrada" ? before + qty : Math.max(0, before - qty);
-              tx.update(itemRef, { estoque: after });
-              tx.set(movRef, {
-                itemId: String(id),
-                type,
-                qty,
-                before,
-                after,
-                createdAt: serverTimestamp(),
-                user: user
-                  ? {
-                      username: user.username || null,
-                      name: user.name || null,
-                      label: user.label || null,
-                    }
-                  : null,
-                itemCodigo: data.codigo || null,
-                itemDescricao: data.descricao || null,
-                itemCodigoInterno: data.codigoInterno || null,
-                note: note || null,
-              });
-            });
+            await updateDoc(itemRef, { estoque: newStock });
             return true;
           } catch (e) {
-            console.error("Erro ao salvar movimentação:", e);
+            console.error("Erro ao salvar no Firebase:", e);
             return false;
           }
         },
 
         async updateUserPassword(username, newHash) {
-          // Atualiza senha localmente e tenta persistir no Firestore.
-          // Mesmo que o Firestore falhe (regras/permissão), mantemos o cache local
-          // para que o login funcione após recarregar/sair.
-          const userIndex = this.users.findIndex(
-            (u) => u.username === username,
-          );
-          if (userIndex > -1) this.users[userIndex].passwordHash = newHash;
-
           try {
-            localStorage.setItem("serob_db_users", JSON.stringify(this.users));
-          } catch (_) {}
-
-          (async () => {
-            try {
-              const userRef = doc(db, "users", username);
-              await updateDoc(userRef, { passwordHash: newHash });
-            } catch (e) {
-              console.warn(
-                "Falha ao atualizar senha no Firestore (mantendo em cache local).",
-                e,
-              );
-            }
-          })();
-
-          return userIndex > -1;
+            const userRef = doc(db, "users", username);
+            await updateDoc(userRef, { passwordHash: newHash });
+            const userIndex = this.users.findIndex(
+              (u) => u.username === username,
+            );
+            if (userIndex > -1) this.users[userIndex].passwordHash = newHash;
+            return true;
+          } catch (e) {
+            console.error(e);
+            return false;
+          }
         },
 
         async importItems(newItems) {
@@ -6195,67 +6102,40 @@
       };
 
       const AuthService = {
+        // Auth agora é feito via Firebase Auth (anônimo) + perfil em users/{uid}
+        // (sem senhas embutidas no HTML).
         state: { currentUser: null },
-        async login(username, password) {
-          const users = FirestoreService.users;
-          // Remove acentos e normaliza a entrada do usuário
-          const normalize = (str) =>
-            (str || "")
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "");
-          const searchKey = normalize(username.trim());
-          // Procura por coincidência exata no username ou no primeiro nome normalizado
-          const targetUser = users.find((u) => {
-            const normalizedUsername = normalize(u.username);
-            const normalizedFirstName = normalize((u.name || "").split(" ")[0]);
-            return (
-              normalizedUsername === searchKey ||
-              normalizedFirstName === searchKey
-            );
-          });
-          if (!targetUser) return false;
-          const inputHash = await SecurityUtils.hash(password);
-          if (targetUser.passwordHash === inputHash) {
-            this.state.currentUser = targetUser;
-            localStorage.setItem("serob_session", JSON.stringify(targetUser));
-            return true;
-          }
-          return false;
-        },
-        logout() {
+        restoreSession() {
+          // Mantido por compatibilidade (não usamos mais sessão local).
           this.state.currentUser = null;
-          localStorage.removeItem("serob_session");
-        },
-        async changePassword(newPassword) {
-          if (!this.state.currentUser) return false;
-          const newHash = await SecurityUtils.hash(newPassword);
-          if (
-            await FirestoreService.updateUserPassword(
-              this.state.currentUser.username,
-              newHash,
-            )
-          ) {
-            this.state.currentUser.passwordHash = newHash;
-            localStorage.setItem(
-              "serob_session",
-              JSON.stringify(this.state.currentUser),
-            );
-            return true;
-          }
-          return false;
         },
         getCurrentUser() {
-          return this.state.currentUser;
-        },
-        restoreSession() {
-          const user = JSON.parse(localStorage.getItem("serob_session"));
-          if (user) this.state.currentUser = user;
+          return FirestoreService.profile || this.state.currentUser;
         },
         isAdmin() {
-          return (
-            this.state.currentUser && this.state.currentUser.role === "admin"
+          const u = this.getCurrentUser();
+          return !!(u && u.role === "admin");
+        },
+        async login() {
+          ToastManager.show(
+            "Login manual foi substituído por acesso automático (convidado).",
+            "error",
           );
+          return false;
+        },
+        async changePassword() {
+          ToastManager.show(
+            "Conta convidado não possui senha. Configure Firebase Auth (email/senha) para isso.",
+            "error",
+          );
+          return false;
+        },
+        async logout() {
+          this.state.currentUser = null;
+          localStorage.removeItem("serob_session");
+          try {
+            await signOut(auth);
+          } catch {}
         },
       };
 
@@ -6292,8 +6172,6 @@
             modal
               .querySelector('div[id$="-content"]')
               ?.classList.add("scale-100");
-            // Atualiza ícones do lucide ao abrir modais
-            if (typeof lucide !== "undefined") lucide.createIcons();
           });
         },
         close(id) {
@@ -6308,51 +6186,6 @@
             modal.classList.add("hidden");
             modal.classList.remove("flex");
           }, 300);
-        },
-      };
-
-      // --- Utilidades Reutilizáveis ---
-      // Esta coleção de funções auxiliares torna o código mais profissional
-      // e consistente ao lidar com números, formatação, escape de HTML e debounce.
-      const Utils = {
-        // Converte um valor em número, retornando fallback se não for numérico
-        num(value, fallback = 0) {
-          const n = Number(value);
-          return Number.isFinite(n) ? n : fallback;
-        },
-        // Arredonda um número para 2 casas decimais
-        round2(n) {
-          return Math.round(this.num(n) * 100) / 100;
-        },
-        // Formata quantidade conforme locale pt-BR com até 2 casas decimais
-        fmtQty(n) {
-          const v = this.round2(n);
-          return v.toLocaleString("pt-BR", {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
-          });
-        },
-        // Escapa caracteres HTML especiais para evitar XSS
-        escapeHTML(str = "") {
-          return String(str).replace(
-            /[&<>"']/g,
-            (m) =>
-              ({
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#39;",
-              })[m],
-          );
-        },
-        // Debounce simples para evitar chamadas excessivas
-        debounce(fn, delay = 300) {
-          let timeout;
-          return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn.apply(this, args), delay);
-          };
         },
       };
 
@@ -6377,10 +6210,7 @@
             }
           } catch (err) {
             console.error(err);
-            ToastManager.show(
-              "Erro ao fazer login. Verifique o console.",
-              "error",
-            );
+            alert("Erro ao fazer login. Verifique o console.");
           } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -6419,126 +6249,6 @@
           }
           btn.innerHTML = originalText;
           btn.disabled = false;
-        },
-
-        /**
-         * Processa o pedido de redefinição de senha no modal de login.
-         * Solicita o nome de usuário, nova senha e confirmação.
-         * Atualiza a senha no Firestore se o usuário existir.
-         */
-        async handleResetPassword(e) {
-          e.preventDefault();
-          const usernameInput = document.getElementById("reset-username");
-          const newPwdInput = document.getElementById("reset-new");
-          const confirmInput = document.getElementById("reset-confirm");
-          const username = usernameInput.value.trim().toLowerCase();
-          const newPwd = newPwdInput.value;
-          const confirm = confirmInput.value;
-          // Validações básicas
-          if (!username) {
-            ToastManager.show("Informe o usuário.", "error");
-            return;
-          }
-          if (newPwd.length < 3) {
-            ToastManager.show("Nova senha muito curta.", "error");
-            return;
-          }
-          if (newPwd !== confirm) {
-            ToastManager.show("Confirmação não coincide.", "error");
-            return;
-          }
-          const btn = e.target.querySelector('button[type="submit"]');
-          const originalText = btn.innerHTML;
-          btn.innerHTML = "Salvando...";
-          btn.disabled = true;
-          try {
-            // Garante que a lista de usuários esteja carregada antes de prosseguir
-            try {
-              await FirestoreService.syncUsers();
-            } catch (syncErrPre) {
-              console.warn(
-                "Não foi possível sincronizar usuários antes da redefinição:",
-                syncErrPre,
-              );
-            }
-            const newHash = await SecurityUtils.hash(newPwd);
-            // Atualiza lista local de usuários e localStorage
-            // Normaliza strings removendo acentos para comparar tanto com o
-            // username quanto com o primeiro nome do usuário. Isso permite que
-            // o campo aceite entradas como "Antônio" ou "Jessé" e localize
-            // corretamente os usuários "antonio" e "jesse".
-            const normalize = (str) =>
-              (str || "")
-                .toLowerCase()
-                .normalize("NFD")
-                // Remove diacríticos (acentos) utilizando faixa unicode genérica
-                .replace(/[\u0300-\u036f]/g, "");
-            const searchKey = normalize(username);
-            // Encontra todos os usuários cujo username ou primeiro nome
-            // (removendo acentos) correspondam à chave de busca.
-            const matchingIndexes = [];
-            FirestoreService.users.forEach((u, idx) => {
-              const normalizedUsername = normalize(u.username);
-              const normalizedFirstName = normalize(
-                (u.name || "").split(" ")[0],
-              );
-              if (
-                normalizedUsername === searchKey ||
-                normalizedFirstName === searchKey
-              ) {
-                matchingIndexes.push(idx);
-              }
-            });
-            if (matchingIndexes.length === 0) {
-              ToastManager.show(
-                "Usuário não encontrado para redefinir senha.",
-                "error",
-              );
-              return;
-            }
-            // Atualiza senha em memória para todos os usuários encontrados
-            for (const idx of matchingIndexes) {
-              FirestoreService.users[idx].passwordHash = newHash;
-              // Tenta atualizar no Firestore (não bloqueante). Usa o username real do
-              // usuário encontrado para que o documento seja atualizado mesmo que o
-              // valor digitado contenha acentos ou abreviações.
-              try {
-                const targetUsername = FirestoreService.users[idx].username;
-                await FirestoreService.updateUserPassword(
-                  targetUsername,
-                  newHash,
-                );
-              } catch (remoteErr) {
-                console.warn(
-                  `Falha ao atualizar senha no Firestore para ${FirestoreService.users[idx].username}:`,
-                  remoteErr,
-                );
-              }
-            }
-            // Persiste em localStorage caso o cache seja utilizado
-            try {
-              localStorage.setItem(
-                "serob_db_users",
-                JSON.stringify(FirestoreService.users),
-              );
-            } catch (lsErr) {
-              console.error("Não foi possível salvar no localStorage:", lsErr);
-            }
-            // Concluído: notifica o usuário e fecha o modal. Não recarregamos a página
-            // para que o novo hash permaneça em memória (FirestoreService.users)
-            // e o login funcione imediatamente com a nova senha.
-            ToastManager.show(
-              "Senha redefinida com sucesso! Use sua nova senha para fazer login.",
-            );
-            ModalManager.close("modal-reset");
-            e.target.reset();
-          } catch (err) {
-            console.error(err);
-            ToastManager.show("Erro inesperado ao redefinir senha.", "error");
-          } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-          }
         },
       };
 
@@ -6591,104 +6301,6 @@
           val = Math.max(1, val + delta);
           input.value = val;
           this.calculateNewStock();
-        },
-        // Atualiza automaticamente os campos de cadastro quando um código de contrato já existente é digitado
-        handleCodigoChange(e) {
-          // Valor digitado no campo de código de contrato
-          const code = (e.target.value || "").trim();
-          if (!code) return;
-          // Procura item pelo campo codigo (contrato)
-          const found = FirestoreService.items.find((item) => {
-            return (
-              item.codigo &&
-              String(item.codigo).trim().toUpperCase() === code.toUpperCase()
-            );
-          });
-          if (found) {
-            // Preenche a descrição
-            const descInput = document.getElementById("new-descricao");
-            if (descInput) {
-              descInput.value = found.descricao || "";
-            }
-            // Preenche o código interno
-            const internoInput = document.getElementById("new-codigo-interno");
-            if (internoInput) {
-              internoInput.value = found.codigoInterno || "";
-            }
-            // Preenche a categoria se existir
-            const categoriaSelect = document.getElementById("new-categoria");
-            if (categoriaSelect) {
-              const catVal = found.categoria || "";
-              if (catVal) {
-                let optionExists = false;
-                Array.from(categoriaSelect.options).forEach((opt) => {
-                  if (opt.value === catVal) optionExists = true;
-                });
-                if (!optionExists) {
-                  const opt = document.createElement("option");
-                  opt.value = catVal;
-                  opt.textContent = catVal;
-                  categoriaSelect.appendChild(opt);
-                }
-                categoriaSelect.value = catVal;
-              }
-            }
-            // Preenche a unidade (tipo de unidade) se existir
-            const unidadeInput = document.getElementById("new-unidade");
-            if (unidadeInput) {
-              unidadeInput.value = found.unidade || "";
-            }
-          }
-        },
-        // Atualiza automaticamente os campos de cadastro quando um código interno já existente é digitado
-        handleCodigoInternoChange(e) {
-          // Valor digitado pelo usuário no campo de código interno
-          const code = (e.target.value || "").trim();
-          if (!code) return;
-          // Procura um item existente no serviço com o mesmo código interno (ignora maiúsculas/minúsculas)
-          const found = FirestoreService.items.find((item) => {
-            return (
-              item.codigoInterno &&
-              String(item.codigoInterno).trim().toUpperCase() ===
-                code.toUpperCase()
-            );
-          });
-          if (found) {
-            // Preenche a descrição do material se existir
-            const descInput = document.getElementById("new-descricao");
-            if (descInput) {
-              descInput.value = found.descricao || "";
-            }
-            // Preenche o código do contrato (campo "Código") se existir
-            const codigoInput = document.getElementById("new-codigo");
-            if (codigoInput) {
-              codigoInput.value = found.codigo || "";
-            }
-            // Preenche a categoria se existir
-            const categoriaSelect = document.getElementById("new-categoria");
-            if (categoriaSelect) {
-              // se o valor não existir nas opções, adiciona temporariamente
-              const catVal = found.categoria || "";
-              if (catVal) {
-                let optionExists = false;
-                Array.from(categoriaSelect.options).forEach((opt) => {
-                  if (opt.value === catVal) optionExists = true;
-                });
-                if (!optionExists) {
-                  const opt = document.createElement("option");
-                  opt.value = catVal;
-                  opt.textContent = catVal;
-                  categoriaSelect.appendChild(opt);
-                }
-                categoriaSelect.value = catVal;
-              }
-            }
-            // Preenche a unidade (tipo de unidade) se existir
-            const unidadeInput = document.getElementById("new-unidade");
-            if (unidadeInput) {
-              unidadeInput.value = found.unidade || "";
-            }
-          }
         },
         async confirmMovement() {
           const qty =
@@ -6832,161 +6444,6 @@
             "R$ " + (custo * total).toFixed(2);
           ModalManager.open("modal-details");
         },
-
-        /**
-         * Manipula a pesquisa de movimentações chamando a renderização das linhas.
-         * É acionado em cada alteração de filtro (texto, tipo, datas).
-         */
-        handleMovementSearch() {
-          this.renderMovementRows();
-        },
-
-        /**
-         * Renderiza as linhas da tabela de movimentações com base nos filtros de pesquisa.
-         * Filtra por termo de busca (descrição, código, código interno), tipo de movimentação,
-         * e intervalos de datas (se preenchidos). Usa o array FirestoreService.movements.
-         */
-        renderMovementRows() {
-          const tbody = document.getElementById("movements-body");
-          if (!tbody) return;
-          // Obtém valores de filtro
-          const searchTerm = (
-            document.getElementById("mov-search-term")?.value || ""
-          )
-            .trim()
-            .toLowerCase();
-          const typeFilter =
-            document.getElementById("mov-type-filter")?.value || "";
-          const dateFromVal =
-            document.getElementById("mov-date-from")?.value || "";
-          const dateToVal = document.getElementById("mov-date-to")?.value || "";
-          const fromDate = dateFromVal ? new Date(dateFromVal) : null;
-          const toDate = dateToVal ? new Date(dateToVal) : null;
-          // Filtra movimentos
-          const list = (FirestoreService.movements || []).filter((mov) => {
-            let ok = true;
-            // Termo de busca: verifica descrição, código ou interno
-            if (searchTerm) {
-              const desc = (mov.itemDescricao || mov.descricao || "")
-                .toString()
-                .toLowerCase();
-              const cod = (mov.itemCodigo || mov.codigo || "")
-                .toString()
-                .toLowerCase();
-              const interno = (mov.itemCodigoInterno || mov.codigoInterno || "")
-                .toString()
-                .toLowerCase();
-              if (
-                !(
-                  desc.includes(searchTerm) ||
-                  cod.includes(searchTerm) ||
-                  interno.includes(searchTerm)
-                )
-              )
-                ok = false;
-            }
-            // Tipo (entrada/saida)
-            if (
-              typeFilter &&
-              mov.type &&
-              mov.type.toString().toLowerCase() !== typeFilter
-            )
-              ok = false;
-            // Datas
-            if ((fromDate || toDate) && mov.createdAt) {
-              let movDate;
-              // Suporta Timestamp do Firestore (com segundos) ou string/Date
-              if (typeof mov.createdAt === "object" && mov.createdAt.seconds) {
-                movDate = new Date(mov.createdAt.seconds * 1000);
-              } else {
-                movDate = new Date(mov.createdAt);
-              }
-              if (fromDate && movDate < fromDate) ok = false;
-              if (toDate) {
-                // Ajusta toDate para final do dia
-                const toAdjusted = new Date(toDateVal + "T23:59:59");
-                if (movDate > toAdjusted) ok = false;
-              }
-            }
-            return ok;
-          });
-          // Ordena por data decrescente (mais recente primeiro)
-          list.sort((a, b) => {
-            const getTime = (m) => {
-              if (
-                m.createdAt &&
-                typeof m.createdAt === "object" &&
-                m.createdAt.seconds
-              ) {
-                return m.createdAt.seconds;
-              }
-              return new Date(m.createdAt || 0).getTime() / 1000;
-            };
-            return getTime(b) - getTime(a);
-          });
-          // Monta HTML das linhas
-          const rows = list
-            .map((mov) => {
-              // Usa utilitário global de escape em vez de recriar função
-              const escapeHTML = (str) => Utils.escapeHTML(str);
-              // Formata data/hora
-              let dateStr = "";
-              if (mov.createdAt) {
-                let dt;
-                if (
-                  typeof mov.createdAt === "object" &&
-                  mov.createdAt.seconds
-                ) {
-                  dt = new Date(mov.createdAt.seconds * 1000);
-                } else {
-                  dt = new Date(mov.createdAt);
-                }
-                dateStr = dt.toLocaleString("pt-BR", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-              }
-              const qty = mov.qty || mov.quantidade || mov.qtd || 0;
-              const before = mov.before || mov.beforeStock || 0;
-              const after = mov.after || mov.afterStock || 0;
-              const tipo = mov.type || mov.tipo || "";
-              const desc = mov.itemDescricao || mov.descricao || "";
-              const cod = mov.itemCodigo || mov.codigo || "";
-              const interno = mov.itemCodigoInterno || mov.codigoInterno || "";
-              // Exibe o nome do usuário: se houver "name", usa apenas o primeiro nome; senão, capitaliza o username
-              let user = "";
-              if (mov.user) {
-                if (mov.user.name) {
-                  // Usa somente o primeiro nome antes do primeiro espaço
-                  const parts = mov.user.name.trim().split(/\s+/);
-                  user = parts.length > 0 ? parts[0] : mov.user.name;
-                } else if (mov.user.username) {
-                  const u = String(mov.user.username);
-                  user = u.charAt(0).toUpperCase() + u.slice(1);
-                }
-              }
-              const note = mov.note || mov.observacao || "";
-              return `<tr class="hover:bg-slate-50 transition-colors">
-                <td class="px-4 py-3 whitespace-nowrap">${dateStr}</td>
-                <td class="px-4 py-3 text-center capitalize">${tipo}</td>
-                <td class="px-4 py-3 text-center">${Utils.fmtQty(qty)}</td>
-                <td class="px-4 py-3">${escapeHTML(desc)}</td>
-                <td class="px-4 py-3">${escapeHTML(cod)}</td>
-                <td class="px-4 py-3">${escapeHTML(interno)}</td>
-                <td class="px-4 py-3 text-center">${Utils.fmtQty(before)}</td>
-                <td class="px-4 py-3 text-center">${Utils.fmtQty(after)}</td>
-                <td class="px-4 py-3">${escapeHTML(user)}</td>
-                <td class="px-4 py-3">${escapeHTML(note)}</td>
-              </tr>`;
-            })
-            .join("");
-          tbody.innerHTML = rows;
-          // Atualiza ícones se houver
-          if (typeof lucide !== "undefined") lucide.createIcons();
-        },
       };
 
       // --- Aplicação Principal ---
@@ -7033,14 +6490,28 @@
           appLayout.classList.add("animate-fade-in");
           appLayout.classList.add("flex");
           this.updateUserProfile();
+          this.maybePromptProfileSetup();
           this.navigate(this.currentTab);
+        },
+
+        maybePromptProfileSetup() {
+          try {
+            const already = localStorage.getItem("serob_profile_choice");
+            if (already) return;
+            const user = AuthService.getCurrentUser();
+            if (!user) return;
+            const name = (user.name || "").toString().trim();
+            if (!name || name.toLowerCase() === "convidado") {
+              this.openProfileSetupModal();
+            }
+          } catch {}
         },
         updateUserProfile() {
           const user = AuthService.getCurrentUser();
           if (!user) return;
-          document.getElementById("user-name").innerText =
-            user.name.split(" ")[0];
-          document.getElementById("user-role").innerText = user.label;
+          const firstName = (user.name || "Convidado").toString().trim().split(" ")[0] || "Convidado";
+          document.getElementById("user-name").innerText = firstName;
+          document.getElementById("user-role").innerText = user.label || (user.role === "admin" ? "Administrador" : "Usuário");
           const iconHtml = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="w-full h-full p-1 fill-slate-600"><path d="M15.71,12.71a6,6,0,1,0-7.42,0,10,10,0,0,0-6.22,8.18,1,1,0,0,0,2,.22,8,8,0,0,1,15.9,0,1,1,0,0,0,1,.89h.11a1,1,0,0,0,.88-1.1A10,10,0,0,0,15.71,12.71ZM12,12a4,4,0,1,1,4-4A4,4,0,0,1,12,12Z"/></svg>`;
           document.getElementById("user-avatar").innerHTML = iconHtml;
           document.getElementById("mobile-user-avatar").innerHTML = iconHtml;
@@ -7117,11 +6588,45 @@
           overlay.classList.toggle("hidden");
           overlay.classList.toggle("opacity-0");
         },
-        logout() {
-          AuthService.logout();
+        async logout() {
+          await AuthService.logout();
+          // Ao recarregar, o login anônimo acontece automaticamente.
           location.reload();
         },
+
+        openProfileSetupModal() {
+          ModalManager.open("modal-profile-setup");
+          try { lucide.createIcons(); } catch {}
+        },
+
+        async applyProfilePreset(presetKey) {
+          try {
+            await FirestoreService.applyProfilePreset(presetKey);
+            localStorage.setItem("serob_profile_choice", presetKey);
+            ModalManager.close("modal-profile-setup");
+            ToastManager.show("Usuário configurado com sucesso!");
+            this.updateUserProfile();
+          } catch (e) {
+            console.error(e);
+            ToastManager.show("Não foi possível configurar o usuário.", "error");
+          }
+        },
+
+        keepGuestProfile() {
+          localStorage.setItem("serob_profile_choice", "guest");
+          ModalManager.close("modal-profile-setup");
+          ToastManager.show("Continuando como Convidado.");
+        },
+
         openPasswordModal() {
+          const u = AuthService.getCurrentUser();
+          if (!u || u.label === "Convidado" || u.isAnonymous) {
+            ToastManager.show(
+              "Conta convidado não possui senha. Use Firebase Auth (email/senha) para habilitar isso.",
+              "error",
+            );
+            return;
+          }
           document.getElementById("pwd-current").value = "";
           document.getElementById("pwd-new").value = "";
           document.getElementById("pwd-confirm").value = "";
@@ -7163,25 +6668,15 @@
           const container = document.getElementById("content-area");
           const user = AuthService.getCurrentUser();
           if (!user) return;
-          // Calcula o estoque total, arredonda para 2 casas decimais e formata para pt-BR
-          const totalRawStock = FirestoreService.items.reduce(
-            (acc, curr) => acc + (Number(curr.estoque) || 0),
-            0,
-          );
-          const totalRoundedStock = Math.round(totalRawStock * 100) / 100;
-          const totalStockFormatted = totalRoundedStock.toLocaleString(
-            "pt-BR",
-            {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 2,
-            },
-          );
           const stats = {
             totalItems: FirestoreService.items.length,
             lowStock: FirestoreService.items.filter(
               (i) => i.estoque <= i.estoqueMinimo,
             ).length,
-            totalStock: totalStockFormatted,
+            totalStock: FirestoreService.items.reduce(
+              (acc, curr) => acc + curr.estoque,
+              0,
+            ),
             categories: [
               ...new Set(FirestoreService.items.map((i) => i.categoria)),
             ].length,
@@ -7467,59 +6962,7 @@
         },
         renderHistoryLayout() {
           const container = document.getElementById("content-area");
-          if (!container) return;
-          const title = "Pesquisa de Movimentação";
-          container.innerHTML = `
-            <div class="space-y-6 h-full flex flex-col animate-fade-in max-w-[1600px] mx-auto">
-              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm sticky top-0 z-10">
-                <div>
-                  <h2 class="text-2xl font-bold text-slate-900">${title}</h2>
-                  <p class="text-sm text-slate-500">Consultar entradas e saídas registradas no estoque</p>
-                </div>
-                <div class="flex flex-col sm:flex-row gap-3">
-                  <div class="relative group">
-                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-500 transition-colors"></i>
-                    <input type="text" id="mov-search-term" placeholder="Buscar item, código..." oninput="InventoryController.handleMovementSearch()" class="w-full sm:w-64 pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-slate-50 focus:bg-white transition-all" />
-                  </div>
-                  <div>
-                    <select id="mov-type-filter" onchange="InventoryController.handleMovementSearch()" class="appearance-none w-full sm:w-40 bg-white border border-slate-300 text-slate-700 py-2.5 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm cursor-pointer shadow-sm hover:border-brand-400 transition-colors">
-                      <option value="">Todos</option>
-                      <option value="entrada">Entradas</option>
-                      <option value="saida">Saídas</option>
-                    </select>
-                  </div>
-                  <div>
-                    <input type="date" id="mov-date-from" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-40 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
-                  </div>
-                    <div>
-                    <input type="date" id="mov-date-to" onchange="InventoryController.handleMovementSearch()" class="w-full sm:w-40 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm bg-white transition-all" />
-                  </div>
-                </div>
-              </div>
-              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
-                <div class="overflow-auto flex-1 custom-scrollbar">
-                  <table class="w-full text-sm text-left relative">
-                    <thead class="bg-slate-50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider sticky top-0 z-10 backdrop-blur-sm border-b border-slate-200">
-                      <tr>
-                        <th class="px-4 py-4">Data/Hora</th>
-                        <th class="px-4 py-4 text-center">Tipo</th>
-                        <th class="px-4 py-4 text-center">Qtd</th>
-                        <th class="px-4 py-4">Descrição</th>
-                        <th class="px-4 py-4">Contrato</th>
-                        <th class="px-4 py-4">Cód. Int.</th>
-                        <th class="px-4 py-4 text-center">Antes</th>
-                        <th class="px-4 py-4 text-center">Depois</th>
-                        <th class="px-4 py-4">Usuário</th>
-                        <th class="px-4 py-4">Obs.</th>
-                      </tr>
-                    </thead>
-                    <tbody id="movements-body" class="divide-y divide-slate-100"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          `;
-          InventoryController.renderMovementRows();
+          container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-400 animate-fade-in"><div class="bg-slate-50 p-6 rounded-full mb-4"><i data-lucide="history" class="w-12 h-12 text-slate-300"></i></div><h3 class="text-lg font-bold text-slate-600 mb-1">Pesquisa de Movimentação</h3><p class="text-sm">Funcionalidade de histórico detalhado em desenvolvimento.</p></div>`;
           lucide.createIcons();
         },
         renderRegisterLayout() {
@@ -7529,10 +6972,10 @@
               <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                 <div class="mb-8"><h2 class="text-2xl font-bold text-slate-900">Cadastro de Material</h2><p class="text-sm text-slate-500">Adicione um novo item ao estoque manualmente.</p></div>
                 <form onsubmit="InventoryController.saveNewItem(event)" class="space-y-5">
-                  <div class="grid grid-cols-2 gap-5"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Código</label><input type="text" id="new-codigo" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: B.01.01.001" required /></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cód. Interno</label><input type="text" id="new-codigo-interno" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Obrigatório" required /></div></div>
+                  <div class="grid grid-cols-2 gap-5"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Código</label><input type="text" id="new-codigo" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: B.01.01.001" required /></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cód. Interno</label><input type="text" id="new-codigo-interno" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Opcional" /></div></div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Descrição do Material</label><input type="text" id="new-descricao" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Nome completo do item" required /></div>
                   <div class="grid grid-cols-2 gap-5">
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Categoria</label><select id="new-categoria" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white"></select></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Categoria</label><select id="new-categoria" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white"><option value="DEPÓSITO GERAL">DEPÓSITO GERAL</option><option value="DEPÓSITO C4 - GÁS">DEPÓSITO C4 - GÁS</option><option value="DEPÓSITO 01 - IMPERMEABILIZAÇÃO">DEPÓSITO 01 - IMPERMEABILIZAÇÃO</option><option value="DEPÓSITO 02 - TINTA ESMALTE">DEPÓSITO 02 - TINTA ESMALTE</option><option value="DEPÓSITO 25 - TINTA ACRÍLICA">DEPÓSITO 25 - TINTA ACRÍLICA</option></select></div>
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Unidade</label><input type="text" id="new-unidade" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: Unidade" required /></div>
                   </div>
                   <div class="grid grid-cols-3 gap-5 border-t border-slate-100 pt-5">
@@ -7544,53 +6987,6 @@
                 </form>
               </div>
             </div>`;
-          // Popula a lista de categorias com todos os depósitos cadastrados no banco
-          (function populateCategories() {
-            const selectCat = document.getElementById("new-categoria");
-            if (selectCat) {
-              // Obtém categorias únicas a partir dos itens carregados
-              const uniqueCats = Array.from(
-                new Set(
-                  (FirestoreService.items || [])
-                    .map((item) => item.categoria)
-                    .filter((c) => c && typeof c === "string"),
-                ),
-              );
-              // Remove a categoria "DEPÓSITO GERAL" se presente
-              const filtered = uniqueCats.filter(
-                (c) => c.trim().toUpperCase() !== "DEPÓSITO GERAL",
-              );
-              // Ordena alfabeticamente
-              filtered.sort((a, b) => a.localeCompare(b));
-              // Monta HTML de opções
-              selectCat.innerHTML = filtered
-                .map((cat) => `<option value="${cat}">${cat}</option>`)
-                .join("");
-            }
-          })();
-          // Adiciona listener para atualizar descrição ao digitar o código interno
-          const codigoInternoInput =
-            document.getElementById("new-codigo-interno");
-          if (codigoInternoInput) {
-            // Usa evento 'input' com debounce para atualizar em tempo real sem sobrecarregar
-            codigoInternoInput.addEventListener(
-              "input",
-              Utils.debounce((e) => {
-                InventoryController.handleCodigoInternoChange(e);
-              }, 300),
-            );
-          }
-          // Adiciona listener para atualizar descrição e código interno ao digitar o código de contrato
-          const codigoInput = document.getElementById("new-codigo");
-          if (codigoInput) {
-            // Usa evento 'input' com debounce para atualizar em tempo real sem sobrecarregar
-            codigoInput.addEventListener(
-              "input",
-              Utils.debounce((e) => {
-                InventoryController.handleCodigoChange(e);
-              }, 300),
-            );
-          }
           lucide.createIcons();
         },
       };
