@@ -6449,6 +6449,31 @@
       // --- Aplicação Principal ---
       const App = {
         currentTab: "dashboard",
+
+        // Formata números para exibição (pt-BR) evitando floats longos.
+        formatNumber(value, maxFractionDigits = 2) {
+          const n = Number(value);
+          const safe = Number.isFinite(n) ? n : 0;
+          return new Intl.NumberFormat("pt-BR", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: maxFractionDigits,
+          }).format(safe);
+        },
+
+        // Soma o estoque total sempre como número.
+        calcTotalStock() {
+          return (FirestoreService.items || []).reduce(
+            (acc, curr) => acc + (Number(curr?.estoque) || 0),
+            0,
+          );
+        },
+
+        // Atualiza KPIs em tela sem precisar re-render completo.
+        updateKpis() {
+          const el = document.getElementById("kpi-total-stock");
+          if (!el) return;
+          el.textContent = this.formatNumber(this.calcTotalStock(), 2);
+        },
         async init() {
           AuthService.restoreSession();
           await FirestoreService.init();
@@ -6473,6 +6498,9 @@
           ) {
             this.renderTableRows();
           }
+
+          // Mantém KPIs (como Estoque Físico) atualizados em tempo real.
+          this.updateKpis();
         },
         resetData() {
           if (
@@ -6673,10 +6701,7 @@
             lowStock: FirestoreService.items.filter(
               (i) => i.estoque <= i.estoqueMinimo,
             ).length,
-            totalStock: FirestoreService.items.reduce(
-              (acc, curr) => acc + curr.estoque,
-              0,
-            ),
+            totalStock: this.calcTotalStock(),
             categories: [
               ...new Set(FirestoreService.items.map((i) => i.categoria)),
             ].length,
@@ -6763,7 +6788,13 @@
             },
           };
           const c = colorMap[color];
-          return `<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow group"><div><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">${title}</p><h3 class="text-3xl font-bold text-slate-900 group-hover:scale-105 transition-transform origin-left">${value}</h3></div><div class="p-3 rounded-xl ${c.bg} ${c.text} ${c.border} border shadow-inner"><i data-lucide="${icon}" class="w-6 h-6"></i></div></div>`;
+          const isTotalStock = title === "Estoque Físico";
+          const displayValue =
+            isTotalStock && typeof value !== "undefined"
+              ? this.formatNumber(value, 2)
+              : value;
+          const valueId = isTotalStock ? 'id="kpi-total-stock"' : "";
+          return `<div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow group"><div><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">${title}</p><h3 ${valueId} class="text-3xl font-bold text-slate-900 group-hover:scale-105 transition-transform origin-left">${displayValue}</h3></div><div class="p-3 rounded-xl ${c.bg} ${c.text} ${c.border} border shadow-inner"><i data-lucide="${icon}" class="w-6 h-6"></i></div></div>`;
         },
         renderMovementsLayout(title) {
           const container = document.getElementById("content-area");
