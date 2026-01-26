@@ -5712,9 +5712,11 @@
         // Mantido por compatibilidade com partes antigas do app (não usamos mais login local)
         users: [],
         items: [],
+        deposits: [],
         _authUnsub: null,
         _listenersStarted: false,
         _itemsUnsub: null,
+        _depositsUnsub: null,
 
         async init() {
           try {
@@ -5747,11 +5749,16 @@
                     // Logout: limpa estado e volta para tela de login
                     this.profile = null;
                     this.items = [];
+                    this.deposits = [];
                     this._listenersStarted = false;
                     try {
                       this._itemsUnsub?.();
                     } catch {}
                     this._itemsUnsub = null;
+                    try {
+                      this._depositsUnsub?.();
+                    } catch {}
+                    this._depositsUnsub = null;
                     const appLayout = document.getElementById("app-layout");
                     if (appLayout) appLayout.classList.add("hidden");
                     const loginLayout = document.getElementById("login-layout");
@@ -5927,6 +5934,8 @@
         },
 
         setupRealtimeListener(onFirstLoad) {
+          // Também mantém a lista de depósitos/categorias sincronizada (para o cadastro).
+          this.setupDepositsListener();
           const itemsRef = collection(db, "items");
           // Evita listeners duplicados (ex.: logout/login)
           try {
@@ -5978,6 +5987,58 @@
               }
             }
           });
+        },
+
+        setupDepositsListener() {
+          try {
+            this._depositsUnsub?.();
+          } catch {}
+          const depositsRef = collection(db, "deposits");
+          this._depositsUnsub = onSnapshot(
+            depositsRef,
+            (snapshot) => {
+              const list = snapshot.docs.map((d) => {
+                const data = d.data() || {};
+                return {
+                  id: d.id,
+                  name: (data.name || data.nome || "").toString(),
+                  order: Number(data.order ?? data.ordem ?? 999999),
+                };
+              });
+
+              // Ordena por ordem (se existir) e depois por nome.
+              list.sort((a, b) => {
+                const diff = (a.order || 0) - (b.order || 0);
+                if (diff !== 0) return diff;
+                return (a.name || "").localeCompare(b.name || "", "pt-BR", {
+                  numeric: true,
+                  sensitivity: "base",
+                });
+              });
+
+              // Remove opção genérica (não hardcode). Se existir no banco e você quiser manter,
+              // basta remover este filtro.
+              this.deposits = list.filter(
+                (d) =>
+                  (d.name || "")
+                    .toString()
+                    .trim()
+                    .toUpperCase() !== "DEPÓSITO GERAL",
+              );
+
+              if (window.App && typeof window.App.renderDepositOptions === "function") {
+                window.App.renderDepositOptions();
+              }
+
+              // Se o usuário já digitou o código interno, tenta autopreencher também a categoria.
+              try {
+                window.InventoryController?.handleCodigoInternoAutoFill?.();
+              } catch {}
+            },
+            (err) => {
+              console.warn("Listener deposits falhou:", err);
+            },
+          );
         },
 
         checkAndMigrateItems() {
@@ -6383,6 +6444,57 @@
           this.state.categoryFilter = val;
           App.renderTableRows();
         },
+
+        // Auto-preenche campos do cadastro ao digitar o Cód. Interno.
+        // Se existir um item com o mesmo codigoInterno no banco, preenche:
+        // Código, Descrição, Categoria e Unidade.
+        handleCodigoInternoAutoFill() {
+          try {
+            const internoEl = document.getElementById("new-codigo-interno");
+            if (!internoEl) return;
+            const raw = (internoEl.value || "").toString().trim();
+            if (!raw) return;
+
+            const toKey = (v) => (v == null ? "" : String(v)).trim().toLowerCase();
+            const key = toKey(raw);
+            const match = (FirestoreService.items || []).find(
+              (it) => toKey(it.codigoInterno) === key,
+            );
+            if (!match) return;
+
+            const codigoEl = document.getElementById("new-codigo");
+            const descEl = document.getElementById("new-descricao");
+            const catEl = document.getElementById("new-categoria");
+            const uniEl = document.getElementById("new-unidade");
+
+            if (codigoEl) codigoEl.value = match.codigo || "";
+            if (descEl) descEl.value = match.descricao || "";
+            if (uniEl) uniEl.value = match.unidade || match.unidadeEntrada || "";
+
+            // Garante que as opções de depósitos estejam carregadas antes de setar.
+            try {
+              window.App?.renderDepositOptions?.();
+            } catch {}
+
+            if (catEl) {
+              const desired = (match.categoria || "").toString();
+              if (desired) {
+                const hasOption = Array.from(catEl.options || []).some(
+                  (o) => o.value === desired,
+                );
+                if (!hasOption) {
+                  const opt = document.createElement("option");
+                  opt.value = desired;
+                  opt.textContent = desired;
+                  catEl.appendChild(opt);
+                }
+                catEl.value = desired;
+              }
+            }
+          } catch (e) {
+            console.warn("Autopreenchimento (cód. interno) falhou:", e);
+          }
+        },
         async saveNewItem(e) {
           e.preventDefault();
           const codigo = document.getElementById("new-codigo").value.trim();
@@ -6392,6 +6504,11 @@
           const descricao = document
             .getElementById("new-descricao")
             .value.trim();
+
+          if (!codigoInterno) {
+            ToastManager.show("Informe o Cód. Interno (obrigatório).", "error");
+            return;
+          }
 
           const duplicado = FirestoreService.items.find((item) => {
             const mesmoCodigo =
@@ -6518,6 +6635,54 @@
           if (!el) return;
           el.textContent = this.formatNumber(this.calcTotalStock(), 2);
         },
+
+        // Preenche o select de Categoria (depósitos) com base na coleção `deposits` do Firestore.
+        // Remove qualquer opção hardcoded do HTML e ignora "DEPÓSITO GERAL".
+        renderDepositOptions() {
+          const sel = document.getElementById("new-categoria");
+          if (!sel) return;
+
+          const current = (sel.value || "").toString();
+          const deposits = (FirestoreService.deposits || [])
+            .map((d) => (d?.name ?? d?.categoria ?? d?.id ?? "").toString())
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .filter((s) => s.toUpperCase() !== "DEPÓSITO GERAL");
+
+          // Limpa opções
+          sel.innerHTML = "";
+
+          // Placeholder
+          const ph = document.createElement("option");
+          ph.value = "";
+          ph.textContent = "Selecione o depósito";
+          ph.disabled = true;
+          ph.selected = !current;
+          sel.appendChild(ph);
+
+          // Ordena por pt-BR
+          deposits
+            .slice()
+            .sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }))
+            .forEach((name) => {
+              const opt = document.createElement("option");
+              opt.value = name;
+              opt.textContent = name;
+              sel.appendChild(opt);
+            });
+
+          // Restaura o valor atual se existir
+          if (current) {
+            const has = Array.from(sel.options).some((o) => o.value === current);
+            if (!has) {
+              const opt = document.createElement("option");
+              opt.value = current;
+              opt.textContent = current;
+              sel.appendChild(opt);
+            }
+            sel.value = current;
+          }
+        },
         async init() {
           AuthService.restoreSession();
           await FirestoreService.init();
@@ -6562,6 +6727,11 @@
           appLayout.classList.add("animate-fade-in");
           appLayout.classList.add("flex");
           this.updateUserProfile();
+          // Prepara o cadastro: carrega depósitos no select e permite autopreenchimento por Cód. Interno.
+          try {
+            this.renderDepositOptions();
+            window.InventoryController?.handleCodigoInternoAutoFill?.();
+          } catch {}
           this.navigate(this.currentTab);
         },
         updateUserProfile() {
@@ -7002,10 +7172,10 @@
               <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                 <div class="mb-8"><h2 class="text-2xl font-bold text-slate-900">Cadastro de Material</h2><p class="text-sm text-slate-500">Adicione um novo item ao estoque manualmente.</p></div>
                 <form onsubmit="InventoryController.saveNewItem(event)" class="space-y-5">
-                  <div class="grid grid-cols-2 gap-5"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Código</label><input type="text" id="new-codigo" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: B.01.01.001" required /></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cód. Interno</label><input type="text" id="new-codigo-interno" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Opcional" /></div></div>
+                  <div class="grid grid-cols-2 gap-5"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Código</label><input type="text" id="new-codigo" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: B.01.01.001" required /></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cód. Interno</label><input type="text" id="new-codigo-interno" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: 12345" required oninput="InventoryController.handleCodigoInternoAutoFill()" /></div></div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Descrição do Material</label><input type="text" id="new-descricao" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Nome completo do item" required /></div>
                   <div class="grid grid-cols-2 gap-5">
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Categoria</label><select id="new-categoria" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white"><option value="DEPÓSITO GERAL">DEPÓSITO GERAL</option><option value="DEPÓSITO C4 - GÁS">DEPÓSITO C4 - GÁS</option><option value="DEPÓSITO 01 - IMPERMEABILIZAÇÃO">DEPÓSITO 01 - IMPERMEABILIZAÇÃO</option><option value="DEPÓSITO 02 - TINTA ESMALTE">DEPÓSITO 02 - TINTA ESMALTE</option><option value="DEPÓSITO 25 - TINTA ACRÍLICA">DEPÓSITO 25 - TINTA ACRÍLICA</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Categoria</label><select id="new-categoria" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-white" required></select></div>
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Unidade</label><input type="text" id="new-unidade" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder="Ex: Unidade" required /></div>
                   </div>
                   <div class="grid grid-cols-3 gap-5 border-t border-slate-100 pt-5">
