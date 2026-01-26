@@ -210,7 +210,7 @@
           <div>
             <label
               class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5"
-              >Usuário</label
+              >Email</label
             >
             <div class="relative group">
               <i
@@ -218,9 +218,9 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-brand-500 transition-colors"
               ></i>
               <input
-                type="text"
+                type="email"
                 id="login-username"
-                placeholder="Digite seu usuário"
+                placeholder="seuemail@dominio.com"
                 class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all bg-slate-50 focus:bg-white"
                 required
               />
@@ -252,6 +252,20 @@
             <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
             <span>Usuário ou senha incorretos.</span>
           </div>
+          <div class="flex items-center justify-between">
+            <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+              <input id="login-remember" type="checkbox" class="accent-brand-600" checked />
+              Manter conectado
+            </label>
+            <button
+              type="button"
+              onclick="AuthController.handleForgotPassword()"
+              class="text-sm font-bold text-brand-700 hover:text-brand-800"
+            >
+              Esqueci minha senha
+            </button>
+          </div>
+
           <button
             type="submit"
             class="w-full bg-brand-600 text-white font-semibold py-3.5 rounded-xl hover:bg-brand-700 active:bg-brand-800 transition-all shadow-lg shadow-brand-600/20 flex items-center justify-center gap-2 group"
@@ -434,12 +448,7 @@
                   </button>
                   <div class="border-t border-slate-50 my-1"></div>
                 </div>
-                <button
-                  onclick="App.openProfileSetupModal()"
-                  class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-                >
-                  <i data-lucide="user-cog" class="w-3.5 h-3.5"></i> Configurar Usuário
-                </button>
+
                 <button
                   onclick="App.openPasswordModal()"
                   class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
@@ -816,89 +825,6 @@
       </div>
     </div>
 
-    <!-- Modal Configurar Usuário (perfil/role no Firestore) -->
-    <div
-      id="modal-profile-setup"
-      class="fixed inset-0 bg-slate-900/60 z-50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0 pointer-events-none"
-    >
-      <div
-        class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 transform scale-95 transition-all duration-300"
-        id="modal-profile-setup-content"
-      >
-        <div class="flex justify-between items-start mb-4">
-          <div>
-            <h3 class="text-xl font-bold text-slate-900 tracking-tight">
-              Configurar Usuário
-            </h3>
-            <p class="text-sm font-medium text-slate-500 mt-1">
-              Escolha quem está usando este dispositivo agora.
-            </p>
-          </div>
-          <button
-            onclick="ModalManager.close('modal-profile-setup')"
-            class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors"
-            title="Fechar"
-          >
-            <i data-lucide="x" class="w-6 h-6"></i>
-          </button>
-        </div>
-
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5">
-          <p class="text-xs text-slate-600 leading-relaxed">
-            Isso define o <span class="font-semibold">nome</span> e a
-            <span class="font-semibold">permissão</span> (Admin/Usuário)
-            em <span class="font-mono">users/{uid}</span>. Você pode trocar
-            depois.
-          </p>
-        </div>
-
-        <div class="grid grid-cols-1 gap-3">
-          <button
-            onclick="App.applyProfilePreset('jefferson_admin')"
-            class="w-full flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-brand-200 bg-brand-50 hover:bg-brand-100 transition-colors"
-          >
-            <div class="text-left">
-              <p class="text-sm font-bold text-brand-900">Jefferson</p>
-              <p class="text-xs font-semibold text-brand-700">Administrador</p>
-            </div>
-            <i data-lucide="shield" class="w-5 h-5 text-brand-700"></i>
-          </button>
-
-          <button
-            onclick="App.applyProfilePreset('jesse_user')"
-            class="w-full flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
-          >
-            <div class="text-left">
-              <p class="text-sm font-bold text-slate-900">Jessé</p>
-              <p class="text-xs font-semibold text-slate-600">Usuário</p>
-            </div>
-            <i data-lucide="user" class="w-5 h-5 text-slate-500"></i>
-          </button>
-
-          <button
-            onclick="App.applyProfilePreset('antonio_user')"
-            class="w-full flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
-          >
-            <div class="text-left">
-              <p class="text-sm font-bold text-slate-900">Antônio</p>
-              <p class="text-xs font-semibold text-slate-600">Usuário</p>
-            </div>
-            <i data-lucide="user" class="w-5 h-5 text-slate-500"></i>
-          </button>
-        </div>
-
-        <div class="flex items-center justify-between mt-6">
-          <button
-            onclick="App.keepGuestProfile()"
-            class="text-sm font-semibold text-slate-600 hover:text-slate-900"
-          >
-            Continuar como Convidado
-          </button>
-          <p class="text-xs text-slate-400">Configuração salva neste dispositivo</p>
-        </div>
-      </div>
-    </div>
-
     <!-- ================== SCRIPT ENGINE ================== -->
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -921,7 +847,15 @@
       } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
       import {
         getAuth,
-        signInAnonymously,
+        onAuthStateChanged,
+        signInWithEmailAndPassword,
+        sendPasswordResetEmail,
+        setPersistence,
+        browserLocalPersistence,
+        browserSessionPersistence,
+        EmailAuthProvider,
+        reauthenticateWithCredential,
+        updatePassword,
         signOut,
       } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
@@ -5778,173 +5712,228 @@
         // Mantido por compatibilidade com partes antigas do app (não usamos mais login local)
         users: [],
         items: [],
+        _authUnsub: null,
+        _listenersStarted: false,
+        _itemsUnsub: null,
 
         async init() {
           try {
-            // ==============================
-            // Login anônimo automático
-            // ==============================
+            // Persistência padrão (usuário pode trocar para sessão no login)
+            try {
+              await setPersistence(auth, browserLocalPersistence);
+            } catch {}
+
             // Não deixa o app travar eternamente na tela "Conectando...".
             const bootTimeout = new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("BOOT_TIMEOUT")),
-                6500,
-              ),
+              setTimeout(() => reject(new Error("BOOT_TIMEOUT")), 6500),
             );
 
-            const cred = await Promise.race([signInAnonymously(auth), bootTimeout]);
-            const fbUser = cred?.user || auth.currentUser;
+            let resolved = false;
 
-            // Cria automaticamente users/{uid} como perfil convidado
-            await this.ensureGuestProfile(fbUser);
+            if (!this._authUnsub) {
+              this._authUnsub = onAuthStateChanged(auth, async (fbUser) => {
+                try {
+                  if (fbUser) {
+                    await this.ensureUserProfile(fbUser);
+                    if (!this._listenersStarted) {
+                      this._listenersStarted = true;
+                      this.setupRealtimeListener(() => {});
+                    }
+                    // Se o App já existe, garante layout
+                    if (window.App && typeof window.App.initLayout === "function") {
+                      window.App.initLayout();
+                    }
+                  } else {
+                    // Logout: limpa estado e volta para tela de login
+                    this.profile = null;
+                    this.items = [];
+                    this._listenersStarted = false;
+                    try {
+                      this._itemsUnsub?.();
+                    } catch {}
+                    this._itemsUnsub = null;
+                    const appLayout = document.getElementById("app-layout");
+                    if (appLayout) appLayout.classList.add("hidden");
+                    const loginLayout = document.getElementById("login-layout");
+                    if (loginLayout) loginLayout.classList.remove("hidden");
+                  }
+                } catch (err) {
+                  console.error("Falha no handler de auth:", err);
+                } finally {
+                  if (!resolved) {
+                    resolved = true;
+                    this._bootResolve?.();
+                  }
+                }
+              });
+            }
 
-            await new Promise((resolve) => {
-              this.setupRealtimeListener(resolve);
-            });
+            await Promise.race([
+              new Promise((resolve) => {
+                this._bootResolve = resolve;
+                if (resolved) resolve();
+              }),
+              bootTimeout,
+            ]);
           } catch (e) {
             console.error("Erro ao conectar Firebase:", e);
-
-            // UI amigável (não trava no loading)
             const loadingText = document.getElementById("loading-text");
             if (loadingText) {
               loadingText.textContent =
-                "Não foi possível conectar ao Firebase. Verifique domínios autorizados, regras e conexão.";
+                "Não foi possível conectar ao Firebase. Verifique domínios autorizados, Auth e conexão.";
             }
             try {
               ToastManager?.show?.(
-                "Falha ao conectar ao Firebase. Verifique configuração e conexão.",
+                "Falha ao conectar ao Firebase. Verifique domínios autorizados e conexão.",
                 "error",
               );
             } catch {}
-            // Mostra a tela de login (fallback visual)
-            const loginLayout = document.getElementById("login-layout");
-            if (loginLayout) loginLayout.classList.remove("hidden");
           }
         },
 
-        async ensureGuestProfile(fbUser) {
+        async ensureUserProfile(fbUser) {
           const user = fbUser || auth.currentUser;
           if (!user) throw new Error("NO_AUTH_USER");
+
+          // Mapeamento fixo (email -> nome/role). Não há senha aqui: as senhas ficam no Firebase Auth.
+          // Observação: "role" no Firestore é um atributo de autorização. Se suas Rules bloquearem
+          // o usuário de setar admin, o app faz fallback (cria perfil como user) e você define o
+          // admin no Console/Rules/Claims.
+          const PRESET_BY_EMAIL = {
+            "antoniosousa.junior@camara.leg.br": {
+              name: "Antônio",
+              role: "user",
+              label: "Usuário",
+            },
+            "jesse.anjos@camara.leg.br": {
+              name: "Jessé",
+              role: "user",
+              label: "Usuário",
+            },
+            "jefferson.araujo@camara.leg.br": {
+              name: "Jefferson",
+              role: "admin",
+              label: "Administrador",
+            },
+          };
 
           const uid = user.uid;
           const ref = doc(db, "users", uid);
 
-          // Perfil mínimo imediato (evita UI vazia enquanto o snapshot não chega)
+          // Perfil mínimo imediato
+          const safeName =
+            user.displayName ||
+            (user.email ? user.email.split("@")[0] : "Usuário");
+          const emailKey = (user.email || "").toLowerCase();
+          const preset = PRESET_BY_EMAIL[emailKey] || null;
+          const desiredName = preset?.name || safeName;
+          const desiredRole = preset?.role || "user";
+          const desiredLabel =
+            preset?.label ||
+            (desiredRole === "admin" ? "Administrador" : "Usuário");
           this.profile = this.profile || {
             uid,
-            name: "Convidado",
-            label: "Convidado",
-            role: "user",
+            name: desiredName,
+            label: desiredLabel,
+            role: desiredRole,
             active: true,
+            email: user.email || null,
           };
 
-          // Se não existir, cria como convidado
           const snap = await getDoc(ref);
           if (!snap.exists()) {
-            await setDoc(
-              ref,
-              {
-                uid,
-                name: "Convidado",
-                label: "Convidado",
-                role: "user",
-                active: true,
-                isAnonymous: true,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
+            const baseDoc = {
+              uid,
+              email: user.email || null,
+              name: desiredName,
+              role: desiredRole,
+              label: desiredLabel,
+              active: true,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            };
+
+            try {
+              await setDoc(ref, baseDoc, { merge: true });
+            } catch (writeErr) {
+              // Se suas Rules não permitirem setar admin no primeiro acesso,
+              // cria como "user" e você promove no Console/Claims.
+              if (desiredRole === "admin") {
+                try {
+                  await setDoc(
+                    ref,
+                    {
+                      ...baseDoc,
+                      role: "user",
+                      label: "Usuário",
+                      updatedAt: serverTimestamp(),
+                    },
+                    { merge: true },
+                  );
+                  ToastManager?.show?.(
+                    "Perfil criado como Usuário. Para tornar Administrador, defina role=admin em users/{uid} ou via Claims.",
+                    "warning",
+                  );
+                } catch (writeErr2) {
+                  console.warn("Falha ao criar perfil fallback:", writeErr2);
+                  throw writeErr2;
+                }
+              } else {
+                throw writeErr;
+              }
+            }
           } else {
-            // Garante campos mínimos
             const data = snap.data() || {};
             const patch = {};
             if (!data.uid) patch.uid = uid;
-            if (!data.name) patch.name = "Convidado";
-            if (!data.label) patch.label = data.role === "admin" ? "Administrador" : "Usuário";
-            if (!data.role) patch.role = "user";
+            if (!data.email && user.email) patch.email = user.email;
+            if (!data.name) patch.name = desiredName;
+            if (!data.role && desiredRole) patch.role = desiredRole;
+            if (!data.label) {
+              const r = data.role || patch.role || "user";
+              patch.label = r === "admin" ? "Administrador" : "Usuário";
+            }
             if (Object.keys(patch).length) {
               patch.updatedAt = serverTimestamp();
-              await setDoc(ref, patch, { merge: true });
+              try {
+                await setDoc(ref, patch, { merge: true });
+              } catch (patchErr) {
+                // Se a tentativa de setar role admin for bloqueada, remove e tenta sem role.
+                if ("role" in patch) {
+                  const safePatch = { ...patch };
+                  delete safePatch.role;
+                  safePatch.label = (data.role || "user") === "admin" ? "Administrador" : "Usuário";
+                  await setDoc(ref, safePatch, { merge: true });
+                } else {
+                  throw patchErr;
+                }
+              }
             }
           }
 
-          // Mantém o perfil em tempo real
           onSnapshot(
             ref,
             (d) => {
               const data = d.exists() ? d.data() : null;
-              this.profile = data || {
-                uid,
-                name: "Convidado",
-                label: "Convidado",
-                role: "user",
-                active: true,
-              };
+              this.profile = data || this.profile;
               if (window.App && typeof window.App.updateUserProfile === "function") {
                 window.App.updateUserProfile();
               }
             },
             (err) => {
               console.warn("Listener users/{uid} falhou:", err);
-              this.profile = this.profile || {
-                uid,
-                name: "Convidado",
-                label: "Convidado",
-                role: "user",
-                active: true,
-              };
             },
-          );
-        },
-
-        // Define nome e permissão do usuário atual em users/{uid}.
-        // (Como o login é anônimo, este preset é uma convenção operacional.)
-        async applyProfilePreset(presetKey) {
-          const fbUser = auth.currentUser;
-          if (!fbUser) throw new Error("NO_AUTH_USER");
-
-          const presets = {
-            jefferson_admin: {
-              name: "Jefferson",
-              role: "admin",
-              label: "Administrador",
-            },
-            jesse_user: {
-              name: "Jessé",
-              role: "user",
-              label: "Usuário",
-            },
-            antonio_user: {
-              name: "Antônio",
-              role: "user",
-              label: "Usuário",
-            },
-          };
-
-          const preset = presets[presetKey];
-          if (!preset) throw new Error("INVALID_PRESET");
-
-          const uid = fbUser.uid;
-          const ref = doc(db, "users", uid);
-          await setDoc(
-            ref,
-            {
-              uid,
-              name: preset.name,
-              role: preset.role,
-              label: preset.label,
-              active: true,
-              isAnonymous: !!fbUser.isAnonymous,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
           );
         },
 
         setupRealtimeListener(onFirstLoad) {
           const itemsRef = collection(db, "items");
-          onSnapshot(itemsRef, async (snapshot) => {
+          // Evita listeners duplicados (ex.: logout/login)
+          try {
+            this._itemsUnsub?.();
+          } catch {}
+
+          this._itemsUnsub = onSnapshot(itemsRef, async (snapshot) => {
             if (snapshot.empty) {
               document.getElementById("loading-text").innerText =
                 "Criando banco de dados...";
@@ -6102,8 +6091,7 @@
       };
 
       const AuthService = {
-        // Auth agora é feito via Firebase Auth (anônimo) + perfil em users/{uid}
-        // (sem senhas embutidas no HTML).
+        // Auth via Firebase Auth (email/senha).
         state: { currentUser: null },
         restoreSession() {
           // Mantido por compatibilidade (não usamos mais sessão local).
@@ -6116,19 +6104,42 @@
           const u = this.getCurrentUser();
           return !!(u && u.role === "admin");
         },
-        async login() {
-          ToastManager.show(
-            "Login manual foi substituído por acesso automático (convidado).",
-            "error",
-          );
-          return false;
+        async login(email, password, remember = true) {
+          const em = (email || "").trim().toLowerCase();
+          if (!em || !password) return false;
+
+          // Persistência: local ("manter conectado") ou sessão.
+          try {
+            await setPersistence(
+              auth,
+              remember ? browserLocalPersistence : browserSessionPersistence,
+            );
+          } catch {}
+
+          try {
+            await signInWithEmailAndPassword(auth, em, password);
+            return true;
+          } catch (err) {
+            console.warn("Falha login Firebase Auth:", err);
+            return false;
+          }
         },
-        async changePassword() {
-          ToastManager.show(
-            "Conta convidado não possui senha. Configure Firebase Auth (email/senha) para isso.",
-            "error",
+        async resetPassword(email) {
+          const em = (email || "").trim().toLowerCase();
+          if (!em) throw new Error("EMAIL_REQUIRED");
+          await sendPasswordResetEmail(auth, em);
+          return true;
+        },
+        async changePassword(currentPassword, newPassword) {
+          const fbUser = auth.currentUser;
+          if (!fbUser || !fbUser.email) throw new Error("NO_AUTH_USER");
+          const cred = EmailAuthProvider.credential(
+            fbUser.email,
+            currentPassword,
           );
-          return false;
+          await reauthenticateWithCredential(fbUser, cred);
+          await updatePassword(fbUser, newPassword);
+          return true;
         },
         async logout() {
           this.state.currentUser = null;
@@ -6138,6 +6149,9 @@
           } catch {}
         },
       };
+
+      // expõe para compatibilidade (scripts module não vão para window automaticamente)
+      window.AuthService = AuthService;
 
       // --- UI Managers ---
       const ToastManager = {
@@ -6193,15 +6207,19 @@
       const AuthController = {
         async handleLogin(e) {
           e.preventDefault();
-          const user = document.getElementById("login-username").value;
+          const email = document.getElementById("login-username").value;
           const pass = document.getElementById("login-password").value;
+          const remember = !!document.getElementById("login-remember")?.checked;
           const btn = e.target.querySelector("button");
           const originalText = btn.innerHTML;
           btn.innerHTML = `<i data-lucide="loader" class="w-5 h-5 animate-spin"></i>`;
           lucide.createIcons();
           btn.disabled = true;
           try {
-            if (await AuthService.login(user, pass)) {
+            if (await AuthService.login(email, pass, remember)) {
+              // onAuthStateChanged vai garantir perfil e listeners; aqui só escondemos o erro.
+              const err = document.getElementById("login-error");
+              err?.classList.add("hidden");
               App.initLayout();
             } else {
               const err = document.getElementById("login-error");
@@ -6222,14 +6240,13 @@
           const current = document.getElementById("pwd-current").value;
           const newPwd = document.getElementById("pwd-new").value;
           const confirm = document.getElementById("pwd-confirm").value;
-          const currentUser = AuthService.getCurrentUser();
-          const currentHash = await SecurityUtils.hash(current);
-          if (currentHash !== currentUser.passwordHash) {
-            ToastManager.show("Senha atual incorreta.", "error");
+
+          if (!current || !newPwd) {
+            ToastManager.show("Preencha todos os campos.", "error");
             return;
           }
-          if (newPwd.length < 3) {
-            ToastManager.show("Nova senha muito curta.", "error");
+          if (newPwd.length < 6) {
+            ToastManager.show("A nova senha deve ter pelo menos 6 caracteres.", "error");
             return;
           }
           if (newPwd !== confirm) {
@@ -6240,15 +6257,42 @@
           const originalText = btn.innerHTML;
           btn.innerHTML = "Salvando...";
           btn.disabled = true;
-          if (await AuthService.changePassword(newPwd)) {
+          try {
+            await AuthService.changePassword(current, newPwd);
             ToastManager.show("Senha alterada com sucesso!");
             ModalManager.close("modal-password");
             e.target.reset();
-          } else {
-            ToastManager.show("Erro ao salvar senha.", "error");
+          } catch (err) {
+            console.warn(err);
+            ToastManager.show(
+              "Não foi possível alterar a senha. Verifique a senha atual e tente novamente.",
+              "error",
+            );
           }
           btn.innerHTML = originalText;
           btn.disabled = false;
+        },
+
+        async handleForgotPassword() {
+          const email = document.getElementById("login-username")?.value || "";
+          const em = (email || "").trim().toLowerCase();
+          if (!em) {
+            ToastManager.show("Digite seu email para redefinir a senha.", "error");
+            return;
+          }
+          try {
+            await AuthService.resetPassword(em);
+            ToastManager.show(
+              "Email de redefinição enviado. Verifique sua caixa de entrada.",
+              "success",
+            );
+          } catch (err) {
+            console.warn(err);
+            ToastManager.show(
+              "Não foi possível enviar o email de redefinição. Verifique o email e tente novamente.",
+              "error",
+            );
+          }
         },
       };
 
@@ -6518,21 +6562,7 @@
           appLayout.classList.add("animate-fade-in");
           appLayout.classList.add("flex");
           this.updateUserProfile();
-          this.maybePromptProfileSetup();
           this.navigate(this.currentTab);
-        },
-
-        maybePromptProfileSetup() {
-          try {
-            const already = localStorage.getItem("serob_profile_choice");
-            if (already) return;
-            const user = AuthService.getCurrentUser();
-            if (!user) return;
-            const name = (user.name || "").toString().trim();
-            if (!name || name.toLowerCase() === "convidado") {
-              this.openProfileSetupModal();
-            }
-          } catch {}
         },
         updateUserProfile() {
           const user = AuthService.getCurrentUser();
@@ -6618,43 +6648,12 @@
         },
         async logout() {
           await AuthService.logout();
-          // Ao recarregar, o login anônimo acontece automaticamente.
-          location.reload();
-        },
-
-        openProfileSetupModal() {
-          ModalManager.open("modal-profile-setup");
-          try { lucide.createIcons(); } catch {}
-        },
-
-        async applyProfilePreset(presetKey) {
-          try {
-            await FirestoreService.applyProfilePreset(presetKey);
-            localStorage.setItem("serob_profile_choice", presetKey);
-            ModalManager.close("modal-profile-setup");
-            ToastManager.show("Usuário configurado com sucesso!");
-            this.updateUserProfile();
-          } catch (e) {
-            console.error(e);
-            ToastManager.show("Não foi possível configurar o usuário.", "error");
-          }
-        },
-
-        keepGuestProfile() {
-          localStorage.setItem("serob_profile_choice", "guest");
-          ModalManager.close("modal-profile-setup");
-          ToastManager.show("Continuando como Convidado.");
+          // onAuthStateChanged já volta para a tela de login.
         },
 
         openPasswordModal() {
           const u = AuthService.getCurrentUser();
-          if (!u || u.label === "Convidado" || u.isAnonymous) {
-            ToastManager.show(
-              "Conta convidado não possui senha. Use Firebase Auth (email/senha) para habilitar isso.",
-              "error",
-            );
-            return;
-          }
+          if (!u) return;
           document.getElementById("pwd-current").value = "";
           document.getElementById("pwd-new").value = "";
           document.getElementById("pwd-confirm").value = "";
